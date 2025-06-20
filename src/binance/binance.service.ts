@@ -15,8 +15,8 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
   private keepAliveInterval: NodeJS.Timeout | null = null;
   private orderUpdateCallback: ((data: any) => void) | null = null;
 
-  private readonly baseURL = 'https://testnet.binance.vision';
-  private readonly wsBaseURL = 'wss://testnet.binance.vision/ws';
+  private readonly baseURL = 'https://testnet.binancefuture.com';
+  private readonly wsBaseURL = 'wss://stream.binancefuture.com/ws';
 
   constructor(private configService: ConfigService) {}
 
