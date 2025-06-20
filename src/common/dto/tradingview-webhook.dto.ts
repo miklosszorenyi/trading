@@ -1,4 +1,5 @@
-import { IsString, IsNumber, IsIn, Transform } from 'class-validator';
+import { IsString, IsNumber, IsIn } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class TradingViewWebhookDto {
   @IsNumber()
@@ -14,8 +15,8 @@ export class TradingViewWebhookDto {
     // Ha már string, akkor hagyjuk
     return value;
   })
-  @IsNumber()
-  @IsIn([0, 1])
+  @IsString()
+  @IsIn(['BUY', 'SELL'])
   type: 'BUY' | 'SELL';
 
   @IsString()
