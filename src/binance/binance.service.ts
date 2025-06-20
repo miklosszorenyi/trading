@@ -187,20 +187,21 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async placeMarketOrder(symbol: string, side: 'BUY' | 'SELL', quantity: number): Promise<any> {
+  async placeMarketOrder(symbol: string, side: 'BUY' | 'SELL', quantity: number, stopPrice: number): Promise<any> {
     try {
       const params = {
         symbol,
         side,
-        type: 'MARKET',
+        type: 'STOP_MARKET',
         quantity: quantity.toString(),
+        stopPrice: stopPrice.toString(),
       };
 
       const order = await this.makeSignedRequest('POST', '/fapi/v1/order', params);
-      this.logger.log(`✅ Market order placed: ${side} ${quantity} ${symbol} - OrderId: ${order.orderId}`);
+      this.logger.log(`✅ Stop market order placed: ${side} ${quantity} ${symbol} at ${stopPrice} - OrderId: ${order.orderId}`);
       return order;
     } catch (error) {
-      this.logger.error(`❌ Failed to place market order: ${side} ${quantity} ${symbol}`, error);
+      this.logger.error(`❌ Failed to place stop market order: ${side} ${quantity} ${symbol} at ${stopPrice}`, error);
       throw error;
     }
   }

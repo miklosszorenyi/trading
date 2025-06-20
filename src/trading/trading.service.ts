@@ -36,6 +36,19 @@ export class TradingService implements OnModuleInit {
         throw new Error('Unable to calculate position size');
       }
 
+      // Get current price for stop price calculation
+      const currentPrice = await this.binanceService.getSymbolPrice(signal.symbol);
+      
+      // Calculate stop price based on signal direction
+      let stopPrice: number;
+      if (signal.type === 'BUY') {
+        // For BUY signals, use a stop price slightly above current price
+        stopPrice = currentPrice * 1.001; // 0.1% above current price
+      } else {
+        // For SELL signals, use a stop price slightly below current price
+        stopPrice = currentPrice * 0.999; // 0.1% below current price
+      }
+
       // Create position record
       const positionId = `${signal.symbol}_${Date.now()}`;
       const position: Position = {
@@ -51,17 +64,18 @@ export class TradingService implements OnModuleInit {
         createdAt: new Date(),
       };
 
-      // Place market order
+      // Place stop market order
       const order = await this.binanceService.placeMarketOrder(
         signal.symbol,
         signal.type,
-        quantity
+        quantity,
+        stopPrice
       );
 
       position.orderId = order.orderId;
       this.positions.set(positionId, position);
 
-      this.logger.log(`📈 Position created: ${positionId} - ${signal.type} ${quantity} ${signal.symbol}`);
+      this.logger.log(`📈 Position created: ${positionId} - ${signal.type} ${quantity} ${signal.symbol} at stop price ${stopPrice}`);
     } catch (error) {
       this.logger.error('❌ Failed to process trading signal', error);
       throw error;
@@ -155,7 +169,7 @@ export class TradingService implements OnModuleInit {
         return;
       }
 
-      // Handle initial market order fill
+      // Handle initial stop market order fill
       if (position.orderId === orderId && status === 'FILLED' && position.status === 'PENDING') {
         position.status = 'FILLED';
         position.entryPrice = avgPrice;
