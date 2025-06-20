@@ -22,7 +22,7 @@ export class TradingController {
     }
   }
 
-  @Get('orders')
+  @Get('info')
   @HttpCode(HttpStatus.OK)
   async getOrdersAndPositions() {
     this.logger.log('📋 Orders and positions requested');
