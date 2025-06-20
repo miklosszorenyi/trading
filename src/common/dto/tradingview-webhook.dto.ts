@@ -14,8 +14,8 @@ export class TradingViewWebhookDto {
     // Ha már string, akkor hagyjuk
     return value;
   })
-  @IsString()
-  @IsIn(['BUY', 'SELL'])
+  @IsNumber()
+  @IsIn([0, 1])
   type: 'BUY' | 'SELL';
 
   @IsString()
