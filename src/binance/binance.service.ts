@@ -66,7 +66,7 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
       .digest('hex');
   }
 
-  private async makeSignedRequest(method: 'GET' | 'POST' | 'DELETE', endpoint: string, params: any = {}) {
+  private async makeSignedRequest(method: 'GET' | 'POST' | 'DELETE' | 'PUT', endpoint: string, params: any = {}) {
     const timestamp = Date.now();
     const queryString = new URLSearchParams({
       ...params,
