@@ -90,7 +90,7 @@ export class TradingService implements OnModuleInit {
     }
   }
 
-  private async calculatePositionSize(symbol: string): Promise<string | null> {
+  private async calculatePositionSize(symbol: string): Promise<number | null> {
     try {
       // Get account balance
       const balances = await this.binanceService.getAccountBalance();
@@ -125,7 +125,7 @@ export class TradingService implements OnModuleInit {
       }
 
       this.logger.log(`💰 Position size calculated: ${quantity} ${symbol} (${maxPositionValue} USDT at ${currentPrice})`);
-      return quantity.toFixed(8);
+      return parseFloat(quantity.toFixed(8));
     } catch (error) {
       this.logger.error('❌ Failed to calculate position size', error);
       return null;

@@ -2,7 +2,7 @@ export interface Position {
   id: string;
   symbol: string;
   side: 'BUY' | 'SELL';
-  quantity: string;
+  quantity: number;
   entryPrice: number;
   stopLoss: number;
   takeProfit: number;
