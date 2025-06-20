@@ -36,7 +36,6 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
       this.client = Binance({
         apiKey,
         apiSecret,
-        useServerTime: true,
         test: true, // Use testnet
       });
 
