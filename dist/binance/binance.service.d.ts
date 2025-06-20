@@ -25,9 +25,9 @@ export declare class BinanceService implements OnModuleInit, OnModuleDestroy {
     getPositions(): Promise<any>;
     getSymbolPrice(symbol: string): Promise<number>;
     getSymbolInfo(symbol: string): Promise<any>;
-    placeMarketOrder(symbol: string, side: 'BUY' | 'SELL', quantity: string): Promise<any>;
-    placeStopLossOrder(symbol: string, side: 'BUY' | 'SELL', quantity: string, stopPrice: number): Promise<any>;
-    placeTakeProfitOrder(symbol: string, side: 'BUY' | 'SELL', quantity: string, stopPrice: number): Promise<any>;
+    placeMarketOrder(symbol: string, side: 'BUY' | 'SELL', quantity: string, stopPrice: string): Promise<any>;
+    placeStopLossOrder(symbol: string, side: 'BUY' | 'SELL', quantity: string, stopPrice: string): Promise<any>;
+    placeTakeProfitOrder(symbol: string, side: 'BUY' | 'SELL', quantity: string, stopPrice: string): Promise<any>;
     cancelOrder(symbol: string, orderId: number): Promise<any>;
     private cleanup;
 }

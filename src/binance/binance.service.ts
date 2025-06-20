@@ -187,14 +187,14 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async placeMarketOrder(symbol: string, side: 'BUY' | 'SELL', quantity: number, stopPrice: number): Promise<any> {
+  async placeMarketOrder(symbol: string, side: 'BUY' | 'SELL', quantity: string, stopPrice: string): Promise<any> {
     try {
       const params = {
         symbol,
         side,
         type: 'STOP_MARKET',
-        quantity: quantity.toString(),
-        stopPrice: stopPrice.toString(),
+        quantity,
+        stopPrice,
       };
 
       const order = await this.makeSignedRequest('POST', '/fapi/v1/order', params);
@@ -206,14 +206,14 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async placeStopLossOrder(symbol: string, side: 'BUY' | 'SELL', quantity: number, stopPrice: number): Promise<any> {
+  async placeStopLossOrder(symbol: string, side: 'BUY' | 'SELL', quantity: string, stopPrice: string): Promise<any> {
     try {
       const params = {
         symbol,
         side: side === 'BUY' ? 'SELL' : 'BUY', // Opposite side for stop loss
         type: 'STOP_MARKET',
-        quantity: quantity.toString(),
-        stopPrice: stopPrice.toString(),
+        quantity,
+        stopPrice,
       };
 
       const order = await this.makeSignedRequest('POST', '/fapi/v1/order', params);
@@ -225,14 +225,14 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async placeTakeProfitOrder(symbol: string, side: 'BUY' | 'SELL', quantity: number, stopPrice: number): Promise<any> {
+  async placeTakeProfitOrder(symbol: string, side: 'BUY' | 'SELL', quantity: string, stopPrice: string): Promise<any> {
     try {
       const params = {
         symbol,
         side: side === 'BUY' ? 'SELL' : 'BUY', // Opposite side for take profit
         type: 'TAKE_PROFIT_MARKET',
-        quantity: quantity.toString(),
-        stopPrice: stopPrice.toString(),
+        quantity,
+        stopPrice,
       };
 
       const order = await this.makeSignedRequest('POST', '/fapi/v1/order', params);

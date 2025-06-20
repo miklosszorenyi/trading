@@ -3,6 +3,15 @@ import { ConfigService } from '@nestjs/config';
 import { BinanceService } from '../binance/binance.service';
 import { TradingViewWebhookDto } from '../common/dto/tradingview-webhook.dto';
 import { Position } from '../common/interfaces/position.interface';
+import { roundToPrecision, formatToPrecision, validateRange } from '../common/utils/precision';
+import { 
+  getQuantityStepSize, 
+  getPriceTickSize, 
+  getMinQuantity, 
+  getMaxQuantity,
+  getMinPrice,
+  getMaxPrice
+} from '../common/utils/filter-utils';
 
 @Injectable()
 export class TradingService implements OnModuleInit {
@@ -30,8 +39,14 @@ export class TradingService implements OnModuleInit {
     try {
       this.logger.log(`🔄 Processing ${signal.type} signal for ${signal.symbol}`);
 
-      // Calculate position size
-      const quantity = await this.calculatePositionSize(signal.symbol);
+      // Get symbol info for precision handling
+      const symbolInfo = await this.binanceService.getSymbolInfo(signal.symbol);
+      if (!symbolInfo) {
+        throw new Error(`Symbol ${signal.symbol} not found`);
+      }
+
+      // Calculate position size with proper precision
+      const quantity = await this.calculatePositionSize(signal.symbol, symbolInfo);
       if (!quantity) {
         throw new Error('Unable to calculate position size');
       }
@@ -39,14 +54,24 @@ export class TradingService implements OnModuleInit {
       // Get current price for stop price calculation
       const currentPrice = await this.binanceService.getSymbolPrice(signal.symbol);
       
-      // Calculate stop price based on signal direction
+      // Calculate stop price based on signal direction with proper precision
+      const priceTickSize = getPriceTickSize(symbolInfo);
       let stopPrice: number;
+      
       if (signal.type === 'BUY') {
         // For BUY signals, use a stop price slightly above current price
-        stopPrice = currentPrice * 1.001; // 0.1% above current price
+        stopPrice = roundToPrecision(currentPrice * 1.001, priceTickSize);
       } else {
         // For SELL signals, use a stop price slightly below current price
-        stopPrice = currentPrice * 0.999; // 0.1% below current price
+        stopPrice = roundToPrecision(currentPrice * 0.999, priceTickSize);
+      }
+
+      // Validate price range
+      const minPrice = getMinPrice(symbolInfo);
+      const maxPrice = getMaxPrice(symbolInfo);
+      
+      if (!validateRange(stopPrice, minPrice, maxPrice)) {
+        throw new Error(`Stop price ${stopPrice} is outside allowed range [${minPrice}, ${maxPrice}]`);
       }
 
       // Create position record
@@ -64,12 +89,12 @@ export class TradingService implements OnModuleInit {
         createdAt: new Date(),
       };
 
-      // Place stop market order
+      // Place stop market order with properly formatted values
       const order = await this.binanceService.placeMarketOrder(
         signal.symbol,
         signal.type,
-        quantity,
-        stopPrice
+        formatToPrecision(quantity, getQuantityStepSize(symbolInfo)),
+        formatToPrecision(stopPrice, priceTickSize)
       );
 
       position.orderId = order.orderId;
@@ -104,8 +129,13 @@ export class TradingService implements OnModuleInit {
     }
   }
 
-  private async calculatePositionSize(symbol: string): Promise<number | null> {
+  private async calculatePositionSize(symbol: string, symbolInfo?: any): Promise<number | null> {
     try {
+      // Get symbol info if not provided
+      if (!symbolInfo) {
+        symbolInfo = await this.binanceService.getSymbolInfo(symbol);
+      }
+
       // Get account balance
       const balances = await this.binanceService.getAccountBalance();
       const usdtBalance = balances.find(b => b.asset === 'USDT');
@@ -121,25 +151,25 @@ export class TradingService implements OnModuleInit {
       // Get current price
       const currentPrice = await this.binanceService.getSymbolPrice(symbol);
       
-      // Get symbol info for precision
-      const symbolInfo = await this.binanceService.getSymbolInfo(symbol);
-      const stepSize = parseFloat(symbolInfo.filters.find(f => f.filterType === 'LOT_SIZE').stepSize);
+      // Get precision values
+      const stepSize = getQuantityStepSize(symbolInfo);
+      const minQty = getMinQuantity(symbolInfo);
+      const maxQty = getMaxQuantity(symbolInfo);
       
       // Calculate quantity
       let quantity = maxPositionValue / currentPrice;
       
-      // Round to step size
-      quantity = Math.floor(quantity / stepSize) * stepSize;
+      // Round to step size with proper precision
+      quantity = roundToPrecision(quantity, stepSize);
       
-      // Ensure minimum quantity
-      const minQty = parseFloat(symbolInfo.filters.find(f => f.filterType === 'LOT_SIZE').minQty);
-      if (quantity < minQty) {
-        this.logger.error(`❌ Calculated quantity ${quantity} is below minimum ${minQty}`);
+      // Validate quantity range
+      if (!validateRange(quantity, minQty, maxQty)) {
+        this.logger.error(`❌ Calculated quantity ${quantity} is outside allowed range [${minQty}, ${maxQty}]`);
         return null;
       }
 
       this.logger.log(`💰 Position size calculated: ${quantity} ${symbol} (${maxPositionValue} USDT at ${currentPrice})`);
-      return parseFloat(quantity.toFixed(8));
+      return quantity;
     } catch (error) {
       this.logger.error('❌ Failed to calculate position size', error);
       return null;
@@ -206,6 +236,15 @@ export class TradingService implements OnModuleInit {
 
   private async placeSLTPOrders(position: Position): Promise<void> {
     try {
+      // Get symbol info for precision handling
+      const symbolInfo = await this.binanceService.getSymbolInfo(position.symbol);
+      if (!symbolInfo) {
+        throw new Error(`Symbol ${position.symbol} not found`);
+      }
+
+      const priceTickSize = getPriceTickSize(symbolInfo);
+      const quantityStepSize = getQuantityStepSize(symbolInfo);
+      
       // Calculate SL and TP prices based on entry price and signal levels
       const entryPrice = position.entryPrice;
       let stopLossPrice: number;
@@ -221,21 +260,37 @@ export class TradingService implements OnModuleInit {
         takeProfitPrice = Math.min(position.takeProfit, entryPrice * 0.96); // Min 4% profit
       }
 
-      // Place stop loss order
+      // Apply precision to prices
+      stopLossPrice = roundToPrecision(stopLossPrice, priceTickSize);
+      takeProfitPrice = roundToPrecision(takeProfitPrice, priceTickSize);
+
+      // Validate price ranges
+      const minPrice = getMinPrice(symbolInfo);
+      const maxPrice = getMaxPrice(symbolInfo);
+      
+      if (!validateRange(stopLossPrice, minPrice, maxPrice)) {
+        throw new Error(`Stop loss price ${stopLossPrice} is outside allowed range`);
+      }
+      
+      if (!validateRange(takeProfitPrice, minPrice, maxPrice)) {
+        throw new Error(`Take profit price ${takeProfitPrice} is outside allowed range`);
+      }
+
+      // Place stop loss order with proper formatting
       const slOrder = await this.binanceService.placeStopLossOrder(
         position.symbol,
         position.side,
-        position.quantity,
-        stopLossPrice
+        formatToPrecision(position.quantity, quantityStepSize),
+        formatToPrecision(stopLossPrice, priceTickSize)
       );
       position.stopLossOrderId = slOrder.orderId;
 
-      // Place take profit order
+      // Place take profit order with proper formatting
       const tpOrder = await this.binanceService.placeTakeProfitOrder(
         position.symbol,
         position.side,
-        position.quantity,
-        takeProfitPrice
+        formatToPrecision(position.quantity, quantityStepSize),
+        formatToPrecision(takeProfitPrice, priceTickSize)
       );
       position.takeProfitOrderId = tpOrder.orderId;
 

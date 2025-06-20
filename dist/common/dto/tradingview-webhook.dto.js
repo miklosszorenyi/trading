@@ -11,6 +11,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TradingViewWebhookDto = void 0;
 const class_validator_1 = require("class-validator");
+const class_transformer_1 = require("class-transformer");
 class TradingViewWebhookDto {
 }
 exports.TradingViewWebhookDto = TradingViewWebhookDto;
@@ -23,6 +24,13 @@ __decorate([
     __metadata("design:type", Number)
 ], TradingViewWebhookDto.prototype, "high", void 0);
 __decorate([
+    (0, class_transformer_1.Transform)(({ value }) => {
+        if (value === 0)
+            return 'SELL';
+        if (value === 1)
+            return 'BUY';
+        return value;
+    }),
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsIn)(['BUY', 'SELL']),
     __metadata("design:type", String)

@@ -79,7 +79,7 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], TradingController.prototype, "handleTradingViewWebhook", null);
 __decorate([
-    (0, common_1.Get)('orders'),
+    (0, common_1.Get)('info'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),

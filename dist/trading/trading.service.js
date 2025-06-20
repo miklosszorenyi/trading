@@ -14,6 +14,8 @@ exports.TradingService = void 0;
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const binance_service_1 = require("../binance/binance.service");
+const precision_1 = require("../common/utils/precision");
+const filter_utils_1 = require("../common/utils/filter-utils");
 let TradingService = TradingService_1 = class TradingService {
     constructor(binanceService, configService) {
         this.binanceService = binanceService;
@@ -31,9 +33,27 @@ let TradingService = TradingService_1 = class TradingService {
     async processTradingSignal(signal) {
         try {
             this.logger.log(`🔄 Processing ${signal.type} signal for ${signal.symbol}`);
-            const quantity = await this.calculatePositionSize(signal.symbol);
+            const symbolInfo = await this.binanceService.getSymbolInfo(signal.symbol);
+            if (!symbolInfo) {
+                throw new Error(`Symbol ${signal.symbol} not found`);
+            }
+            const quantity = await this.calculatePositionSize(signal.symbol, symbolInfo);
             if (!quantity) {
                 throw new Error('Unable to calculate position size');
+            }
+            const currentPrice = await this.binanceService.getSymbolPrice(signal.symbol);
+            const priceTickSize = (0, filter_utils_1.getPriceTickSize)(symbolInfo);
+            let stopPrice;
+            if (signal.type === 'BUY') {
+                stopPrice = (0, precision_1.roundToPrecision)(currentPrice * 1.001, priceTickSize);
+            }
+            else {
+                stopPrice = (0, precision_1.roundToPrecision)(currentPrice * 0.999, priceTickSize);
+            }
+            const minPrice = (0, filter_utils_1.getMinPrice)(symbolInfo);
+            const maxPrice = (0, filter_utils_1.getMaxPrice)(symbolInfo);
+            if (!(0, precision_1.validateRange)(stopPrice, minPrice, maxPrice)) {
+                throw new Error(`Stop price ${stopPrice} is outside allowed range [${minPrice}, ${maxPrice}]`);
             }
             const positionId = `${signal.symbol}_${Date.now()}`;
             const position = {
@@ -48,10 +68,10 @@ let TradingService = TradingService_1 = class TradingService {
                 status: 'PENDING',
                 createdAt: new Date(),
             };
-            const order = await this.binanceService.placeMarketOrder(signal.symbol, signal.type, quantity);
+            const order = await this.binanceService.placeMarketOrder(signal.symbol, signal.type, (0, precision_1.formatToPrecision)(quantity, (0, filter_utils_1.getQuantityStepSize)(symbolInfo)), (0, precision_1.formatToPrecision)(stopPrice, priceTickSize));
             position.orderId = order.orderId;
             this.positions.set(positionId, position);
-            this.logger.log(`📈 Position created: ${positionId} - ${signal.type} ${quantity} ${signal.symbol}`);
+            this.logger.log(`📈 Position created: ${positionId} - ${signal.type} ${quantity} ${signal.symbol} at stop price ${stopPrice}`);
         }
         catch (error) {
             this.logger.error('❌ Failed to process trading signal', error);
@@ -76,8 +96,11 @@ let TradingService = TradingService_1 = class TradingService {
             throw error;
         }
     }
-    async calculatePositionSize(symbol) {
+    async calculatePositionSize(symbol, symbolInfo) {
         try {
+            if (!symbolInfo) {
+                symbolInfo = await this.binanceService.getSymbolInfo(symbol);
+            }
             const balances = await this.binanceService.getAccountBalance();
             const usdtBalance = balances.find(b => b.asset === 'USDT');
             if (!usdtBalance || parseFloat(usdtBalance.walletBalance) <= 0) {
@@ -87,17 +110,17 @@ let TradingService = TradingService_1 = class TradingService {
             const availableBalance = parseFloat(usdtBalance.walletBalance);
             const maxPositionValue = (availableBalance * this.maxPositionPercentage) / 100;
             const currentPrice = await this.binanceService.getSymbolPrice(symbol);
-            const symbolInfo = await this.binanceService.getSymbolInfo(symbol);
-            const stepSize = parseFloat(symbolInfo.filters.find(f => f.filterType === 'LOT_SIZE').stepSize);
+            const stepSize = (0, filter_utils_1.getQuantityStepSize)(symbolInfo);
+            const minQty = (0, filter_utils_1.getMinQuantity)(symbolInfo);
+            const maxQty = (0, filter_utils_1.getMaxQuantity)(symbolInfo);
             let quantity = maxPositionValue / currentPrice;
-            quantity = Math.floor(quantity / stepSize) * stepSize;
-            const minQty = parseFloat(symbolInfo.filters.find(f => f.filterType === 'LOT_SIZE').minQty);
-            if (quantity < minQty) {
-                this.logger.error(`❌ Calculated quantity ${quantity} is below minimum ${minQty}`);
+            quantity = (0, precision_1.roundToPrecision)(quantity, stepSize);
+            if (!(0, precision_1.validateRange)(quantity, minQty, maxQty)) {
+                this.logger.error(`❌ Calculated quantity ${quantity} is outside allowed range [${minQty}, ${maxQty}]`);
                 return null;
             }
             this.logger.log(`💰 Position size calculated: ${quantity} ${symbol} (${maxPositionValue} USDT at ${currentPrice})`);
-            return quantity.toFixed(8);
+            return quantity;
         }
         catch (error) {
             this.logger.error('❌ Failed to calculate position size', error);
@@ -146,6 +169,12 @@ let TradingService = TradingService_1 = class TradingService {
     }
     async placeSLTPOrders(position) {
         try {
+            const symbolInfo = await this.binanceService.getSymbolInfo(position.symbol);
+            if (!symbolInfo) {
+                throw new Error(`Symbol ${position.symbol} not found`);
+            }
+            const priceTickSize = (0, filter_utils_1.getPriceTickSize)(symbolInfo);
+            const quantityStepSize = (0, filter_utils_1.getQuantityStepSize)(symbolInfo);
             const entryPrice = position.entryPrice;
             let stopLossPrice;
             let takeProfitPrice;
@@ -157,9 +186,19 @@ let TradingService = TradingService_1 = class TradingService {
                 stopLossPrice = Math.max(position.stopLoss, entryPrice * 1.02);
                 takeProfitPrice = Math.min(position.takeProfit, entryPrice * 0.96);
             }
-            const slOrder = await this.binanceService.placeStopLossOrder(position.symbol, position.side, position.quantity, stopLossPrice);
+            stopLossPrice = (0, precision_1.roundToPrecision)(stopLossPrice, priceTickSize);
+            takeProfitPrice = (0, precision_1.roundToPrecision)(takeProfitPrice, priceTickSize);
+            const minPrice = (0, filter_utils_1.getMinPrice)(symbolInfo);
+            const maxPrice = (0, filter_utils_1.getMaxPrice)(symbolInfo);
+            if (!(0, precision_1.validateRange)(stopLossPrice, minPrice, maxPrice)) {
+                throw new Error(`Stop loss price ${stopLossPrice} is outside allowed range`);
+            }
+            if (!(0, precision_1.validateRange)(takeProfitPrice, minPrice, maxPrice)) {
+                throw new Error(`Take profit price ${takeProfitPrice} is outside allowed range`);
+            }
+            const slOrder = await this.binanceService.placeStopLossOrder(position.symbol, position.side, (0, precision_1.formatToPrecision)(position.quantity, quantityStepSize), (0, precision_1.formatToPrecision)(stopLossPrice, priceTickSize));
             position.stopLossOrderId = slOrder.orderId;
-            const tpOrder = await this.binanceService.placeTakeProfitOrder(position.symbol, position.side, position.quantity, takeProfitPrice);
+            const tpOrder = await this.binanceService.placeTakeProfitOrder(position.symbol, position.side, (0, precision_1.formatToPrecision)(position.quantity, quantityStepSize), (0, precision_1.formatToPrecision)(takeProfitPrice, priceTickSize));
             position.takeProfitOrderId = tpOrder.orderId;
             this.logger.log(`🎯 SL/TP orders placed for ${position.id}: SL@${stopLossPrice}, TP@${takeProfitPrice}`);
         }

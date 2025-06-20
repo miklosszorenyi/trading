@@ -173,20 +173,21 @@ let BinanceService = BinanceService_1 = class BinanceService {
             throw error;
         }
     }
-    async placeMarketOrder(symbol, side, quantity) {
+    async placeMarketOrder(symbol, side, quantity, stopPrice) {
         try {
             const params = {
                 symbol,
                 side,
-                type: 'MARKET',
+                type: 'STOP_MARKET',
                 quantity,
+                stopPrice,
             };
             const order = await this.makeSignedRequest('POST', '/fapi/v1/order', params);
-            this.logger.log(`✅ Market order placed: ${side} ${quantity} ${symbol} - OrderId: ${order.orderId}`);
+            this.logger.log(`✅ Stop market order placed: ${side} ${quantity} ${symbol} at ${stopPrice} - OrderId: ${order.orderId}`);
             return order;
         }
         catch (error) {
-            this.logger.error(`❌ Failed to place market order: ${side} ${quantity} ${symbol}`, error);
+            this.logger.error(`❌ Failed to place stop market order: ${side} ${quantity} ${symbol} at ${stopPrice}`, error);
             throw error;
         }
     }
@@ -197,7 +198,7 @@ let BinanceService = BinanceService_1 = class BinanceService {
                 side: side === 'BUY' ? 'SELL' : 'BUY',
                 type: 'STOP_MARKET',
                 quantity,
-                stopPrice: stopPrice.toString(),
+                stopPrice,
             };
             const order = await this.makeSignedRequest('POST', '/fapi/v1/order', params);
             this.logger.log(`🛑 Stop loss order placed: ${quantity} ${symbol} at ${stopPrice} - OrderId: ${order.orderId}`);
@@ -215,7 +216,7 @@ let BinanceService = BinanceService_1 = class BinanceService {
                 side: side === 'BUY' ? 'SELL' : 'BUY',
                 type: 'TAKE_PROFIT_MARKET',
                 quantity,
-                stopPrice: stopPrice.toString(),
+                stopPrice,
             };
             const order = await this.makeSignedRequest('POST', '/fapi/v1/order', params);
             this.logger.log(`🎯 Take profit order placed: ${quantity} ${symbol} at ${stopPrice} - OrderId: ${order.orderId}`);
