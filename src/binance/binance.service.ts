@@ -36,7 +36,8 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
       this.client = Binance({
         apiKey,
         apiSecret,
-        test: true, // Use testnet
+        httpBase: 'https://testnet.binance.vision',
+        wsBase: 'wss://testnet.binance.vision/ws',
       });
 
       // Test connection
