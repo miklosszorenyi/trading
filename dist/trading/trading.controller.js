@@ -33,6 +33,21 @@ let TradingController = TradingController_1 = class TradingController {
             return { success: false, message: 'Failed to process signal', error: error.message };
         }
     }
+    async getActiveOrders() {
+        this.logger.log('📋 Active orders requested');
+        try {
+            const positions = this.tradingService.getActivePositions();
+            return {
+                success: true,
+                count: positions.length,
+                positions: positions
+            };
+        }
+        catch (error) {
+            this.logger.error('❌ Failed to get active orders', error);
+            return { success: false, message: 'Failed to get active orders', error: error.message };
+        }
+    }
     async testEndpoint() {
         this.logger.log('🧪 Test endpoint called');
         return {
@@ -51,6 +66,13 @@ __decorate([
     __metadata("design:paramtypes", [tradingview_webhook_dto_1.TradingViewWebhookDto]),
     __metadata("design:returntype", Promise)
 ], TradingController.prototype, "handleTradingViewWebhook", null);
+__decorate([
+    (0, common_1.Get)('orders'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], TradingController.prototype, "getActiveOrders", null);
 __decorate([
     (0, common_1.Post)('test'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),

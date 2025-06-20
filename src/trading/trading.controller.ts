@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Logger, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Get, Body, Logger, HttpCode, HttpStatus } from '@nestjs/common';
 import { TradingService } from './trading.service';
 import { TradingViewWebhookDto } from '../common/dto/tradingview-webhook.dto';
 
@@ -19,6 +19,24 @@ export class TradingController {
     } catch (error) {
       this.logger.error('❌ Failed to process trading signal', error);
       return { success: false, message: 'Failed to process signal', error: error.message };
+    }
+  }
+
+  @Get('orders')
+  @HttpCode(HttpStatus.OK)
+  async getActiveOrders() {
+    this.logger.log('📋 Active orders requested');
+    
+    try {
+      const positions = this.tradingService.getActivePositions();
+      return {
+        success: true,
+        count: positions.length,
+        positions: positions
+      };
+    } catch (error) {
+      this.logger.error('❌ Failed to get active orders', error);
+      return { success: false, message: 'Failed to get active orders', error: error.message };
     }
   }
 
