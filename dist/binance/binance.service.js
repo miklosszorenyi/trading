@@ -26,37 +26,24 @@ let BinanceService = BinanceService_1 = class BinanceService {
         this.orderUpdateCallback = null;
         this.baseURL = 'https://testnet.binancefuture.com';
         this.wsBaseURL = 'wss://stream.binancefuture.com/ws';
+        this.apiKey = this.configService.get('BINANCE_API_KEY');
+        this.apiSecret = this.configService.get('BINANCE_API_SECRET');
+        if (!this.apiKey || !this.apiSecret) {
+            throw new Error('Binance API credentials not found in environment variables');
+        }
+        this.httpClient = axios_1.default.create({
+            baseURL: this.baseURL,
+            headers: {
+                'X-MBX-APIKEY': this.apiKey,
+            },
+        });
     }
     async onModuleInit() {
-        await this.initializeBinanceClient();
         await this.setupUserDataStream();
+        this.logger.log('✅ Binance service initialized');
     }
     async onModuleDestroy() {
         await this.cleanup();
-    }
-    async initializeBinanceClient() {
-        try {
-            this.apiKey = this.configService.get('BINANCE_API_KEY');
-            this.apiSecret = this.configService.get('BINANCE_API_SECRET');
-            if (!this.apiKey || !this.apiSecret) {
-                throw new Error('Binance API credentials not found in environment variables');
-            }
-            this.httpClient = axios_1.default.create({
-                baseURL: this.baseURL,
-                headers: {
-                    'X-MBX-APIKEY': this.apiKey,
-                },
-            });
-            await this.httpClient.get('/api/v3/ping');
-            this.logger.log('✅ Connected to Binance Testnet API');
-            const accountInfo = await this.getAccountInfo();
-            const nonZeroBalances = accountInfo.balances.filter(b => parseFloat(b.free) > 0);
-            this.logger.log(`💰 Account balance: ${JSON.stringify(nonZeroBalances)}`);
-        }
-        catch (error) {
-            this.logger.error('❌ Failed to initialize Binance client', error);
-            throw error;
-        }
     }
     createSignature(queryString) {
         return crypto
@@ -135,12 +122,9 @@ let BinanceService = BinanceService_1 = class BinanceService {
     setOrderUpdateCallback(callback) {
         this.orderUpdateCallback = callback;
     }
-    async getAccountInfo() {
-        return await this.makeSignedRequest('GET', '/api/v3/account');
-    }
     async getAccountBalance() {
         try {
-            const accountInfo = await this.getAccountInfo();
+            const accountInfo = await this.makeSignedRequest('GET', '/api/v3/account');
             return accountInfo.balances;
         }
         catch (error) {

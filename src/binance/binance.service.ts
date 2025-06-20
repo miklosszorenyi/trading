@@ -18,45 +18,29 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
   private readonly baseURL = 'https://testnet.binancefuture.com';
   private readonly wsBaseURL = 'wss://stream.binancefuture.com/ws';
 
-  constructor(private configService: ConfigService) {}
+  constructor(private configService: ConfigService) {
+    this.apiKey = this.configService.get<string>('BINANCE_API_KEY');
+    this.apiSecret = this.configService.get<string>('BINANCE_API_SECRET');
+
+    if (!this.apiKey || !this.apiSecret) {
+      throw new Error('Binance API credentials not found in environment variables');
+    }
+
+    this.httpClient = axios.create({
+      baseURL: this.baseURL,
+      headers: {
+        'X-MBX-APIKEY': this.apiKey,
+      },
+    });
+  }
 
   async onModuleInit() {
-    await this.initializeBinanceClient();
     await this.setupUserDataStream();
+    this.logger.log('✅ Binance service initialized');
   }
 
   async onModuleDestroy() {
     await this.cleanup();
-  }
-
-  private async initializeBinanceClient() {
-    try {
-      this.apiKey = this.configService.get<string>('BINANCE_API_KEY');
-      this.apiSecret = this.configService.get<string>('BINANCE_API_SECRET');
-
-      if (!this.apiKey || !this.apiSecret) {
-        throw new Error('Binance API credentials not found in environment variables');
-      }
-
-      this.httpClient = axios.create({
-        baseURL: this.baseURL,
-        headers: {
-          'X-MBX-APIKEY': this.apiKey,
-        },
-      });
-
-      // Test connection
-      await this.httpClient.get('/api/v3/ping');
-      this.logger.log('✅ Connected to Binance Testnet API');
-
-      // Log account info
-      const accountInfo = await this.getAccountInfo();
-      const nonZeroBalances = accountInfo.balances.filter(b => parseFloat(b.free) > 0);
-      this.logger.log(`💰 Account balance: ${JSON.stringify(nonZeroBalances)}`);
-    } catch (error) {
-      this.logger.error('❌ Failed to initialize Binance client', error);
-      throw error;
-    }
   }
 
   private createSignature(queryString: string): string {
@@ -151,13 +135,9 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
     this.orderUpdateCallback = callback;
   }
 
-  private async getAccountInfo(): Promise<any> {
-    return await this.makeSignedRequest('GET', '/api/v3/account');
-  }
-
   async getAccountBalance(): Promise<any> {
     try {
-      const accountInfo = await this.getAccountInfo();
+      const accountInfo = await this.makeSignedRequest('GET', '/api/v3/account');
       return accountInfo.balances;
     } catch (error) {
       this.logger.error('❌ Failed to get account balance', error);

@@ -15,13 +15,11 @@ export declare class BinanceService implements OnModuleInit, OnModuleDestroy {
     constructor(configService: ConfigService);
     onModuleInit(): Promise<void>;
     onModuleDestroy(): Promise<void>;
-    private initializeBinanceClient;
     private createSignature;
     private makeSignedRequest;
     private setupUserDataStream;
     private handleOrderUpdate;
     setOrderUpdateCallback(callback: (data: any) => void): void;
-    private getAccountInfo;
     getAccountBalance(): Promise<any>;
     getSymbolPrice(symbol: string): Promise<number>;
     getSymbolInfo(symbol: string): Promise<any>;
