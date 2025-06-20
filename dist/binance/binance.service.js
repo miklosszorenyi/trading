@@ -132,6 +132,27 @@ let BinanceService = BinanceService_1 = class BinanceService {
             throw error;
         }
     }
+    async getOpenOrders(symbol) {
+        try {
+            const params = symbol ? { symbol } : {};
+            const orders = await this.makeSignedRequest('GET', '/fapi/v1/openOrders', params);
+            return orders;
+        }
+        catch (error) {
+            this.logger.error('❌ Failed to get open orders', error);
+            throw error;
+        }
+    }
+    async getPositions() {
+        try {
+            const positions = await this.makeSignedRequest('GET', '/fapi/v2/positionRisk');
+            return positions.filter(pos => parseFloat(pos.positionAmt) !== 0);
+        }
+        catch (error) {
+            this.logger.error('❌ Failed to get positions', error);
+            throw error;
+        }
+    }
     async getSymbolPrice(symbol) {
         try {
             const response = await this.httpClient.get(`/fapi/v1/ticker/price?symbol=${symbol}`);

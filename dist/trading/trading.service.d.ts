@@ -12,6 +12,11 @@ export declare class TradingService implements OnModuleInit {
     constructor(binanceService: BinanceService, configService: ConfigService);
     onModuleInit(): void;
     processTradingSignal(signal: TradingViewWebhookDto): Promise<void>;
+    getOrdersAndPositions(): Promise<{
+        managedPositions: Position[];
+        openOrders: any;
+        activePositions: any;
+    }>;
     private calculatePositionSize;
     private handleOrderUpdate;
     private placeSLTPOrders;

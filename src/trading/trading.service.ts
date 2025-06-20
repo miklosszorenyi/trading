@@ -68,18 +68,40 @@ export class TradingService implements OnModuleInit {
     }
   }
 
+  async getOrdersAndPositions() {
+    try {
+      // Memóriában tárolt pozíciók (TradingView signalokból)
+      const managedPositions = this.getActivePositions();
+      
+      // Binance API-ból lekért adatok
+      const [openOrders, activePositions] = await Promise.all([
+        this.binanceService.getOpenOrders(),
+        this.binanceService.getPositions()
+      ]);
+
+      return {
+        managedPositions,
+        openOrders,
+        activePositions
+      };
+    } catch (error) {
+      this.logger.error('❌ Failed to get orders and positions', error);
+      throw error;
+    }
+  }
+
   private async calculatePositionSize(symbol: string): Promise<string | null> {
     try {
       // Get account balance
       const balances = await this.binanceService.getAccountBalance();
       const usdtBalance = balances.find(b => b.asset === 'USDT');
       
-      if (!usdtBalance || parseFloat(usdtBalance.free) <= 0) {
+      if (!usdtBalance || parseFloat(usdtBalance.walletBalance) <= 0) {
         this.logger.error('❌ Insufficient USDT balance');
         return null;
       }
 
-      const availableBalance = parseFloat(usdtBalance.free);
+      const availableBalance = parseFloat(usdtBalance.walletBalance);
       const maxPositionValue = (availableBalance * this.maxPositionPercentage) / 100;
 
       // Get current price

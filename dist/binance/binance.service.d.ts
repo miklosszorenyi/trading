@@ -21,6 +21,8 @@ export declare class BinanceService implements OnModuleInit, OnModuleDestroy {
     private handleOrderUpdate;
     setOrderUpdateCallback(callback: (data: any) => void): void;
     getAccountBalance(): Promise<any>;
+    getOpenOrders(symbol?: string): Promise<any>;
+    getPositions(): Promise<any>;
     getSymbolPrice(symbol: string): Promise<number>;
     getSymbolInfo(symbol: string): Promise<any>;
     placeMarketOrder(symbol: string, side: 'BUY' | 'SELL', quantity: string): Promise<any>;

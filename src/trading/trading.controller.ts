@@ -24,19 +24,34 @@ export class TradingController {
 
   @Get('orders')
   @HttpCode(HttpStatus.OK)
-  async getActiveOrders() {
-    this.logger.log('📋 Active orders requested');
+  async getOrdersAndPositions() {
+    this.logger.log('📋 Orders and positions requested');
     
     try {
-      const positions = this.tradingService.getActivePositions();
+      const data = await this.tradingService.getOrdersAndPositions();
       return {
         success: true,
-        count: positions.length,
-        positions: positions
+        data: {
+          // Memóriában tárolt pozíciók (TradingView signalokból)
+          managedPositions: {
+            count: data.managedPositions.length,
+            positions: data.managedPositions
+          },
+          // Binance API-ból lekért nyitott megbízások
+          openOrders: {
+            count: data.openOrders.length,
+            orders: data.openOrders
+          },
+          // Binance API-ból lekért aktív pozíciók
+          activePositions: {
+            count: data.activePositions.length,
+            positions: data.activePositions
+          }
+        }
       };
     } catch (error) {
-      this.logger.error('❌ Failed to get active orders', error);
-      return { success: false, message: 'Failed to get active orders', error: error.message };
+      this.logger.error('❌ Failed to get orders and positions', error);
+      return { success: false, message: 'Failed to get orders and positions', error: error.message };
     }
   }
 

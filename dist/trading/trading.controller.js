@@ -33,19 +33,31 @@ let TradingController = TradingController_1 = class TradingController {
             return { success: false, message: 'Failed to process signal', error: error.message };
         }
     }
-    async getActiveOrders() {
-        this.logger.log('📋 Active orders requested');
+    async getOrdersAndPositions() {
+        this.logger.log('📋 Orders and positions requested');
         try {
-            const positions = this.tradingService.getActivePositions();
+            const data = await this.tradingService.getOrdersAndPositions();
             return {
                 success: true,
-                count: positions.length,
-                positions: positions
+                data: {
+                    managedPositions: {
+                        count: data.managedPositions.length,
+                        positions: data.managedPositions
+                    },
+                    openOrders: {
+                        count: data.openOrders.length,
+                        orders: data.openOrders
+                    },
+                    activePositions: {
+                        count: data.activePositions.length,
+                        positions: data.activePositions
+                    }
+                }
             };
         }
         catch (error) {
-            this.logger.error('❌ Failed to get active orders', error);
-            return { success: false, message: 'Failed to get active orders', error: error.message };
+            this.logger.error('❌ Failed to get orders and positions', error);
+            return { success: false, message: 'Failed to get orders and positions', error: error.message };
         }
     }
     async testEndpoint() {
@@ -72,7 +84,7 @@ __decorate([
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)
-], TradingController.prototype, "getActiveOrders", null);
+], TradingController.prototype, "getOrdersAndPositions", null);
 __decorate([
     (0, common_1.Post)('test'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),

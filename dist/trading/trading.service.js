@@ -58,15 +58,33 @@ let TradingService = TradingService_1 = class TradingService {
             throw error;
         }
     }
+    async getOrdersAndPositions() {
+        try {
+            const managedPositions = this.getActivePositions();
+            const [openOrders, activePositions] = await Promise.all([
+                this.binanceService.getOpenOrders(),
+                this.binanceService.getPositions()
+            ]);
+            return {
+                managedPositions,
+                openOrders,
+                activePositions
+            };
+        }
+        catch (error) {
+            this.logger.error('❌ Failed to get orders and positions', error);
+            throw error;
+        }
+    }
     async calculatePositionSize(symbol) {
         try {
             const balances = await this.binanceService.getAccountBalance();
             const usdtBalance = balances.find(b => b.asset === 'USDT');
-            if (!usdtBalance || parseFloat(usdtBalance.free) <= 0) {
+            if (!usdtBalance || parseFloat(usdtBalance.walletBalance) <= 0) {
                 this.logger.error('❌ Insufficient USDT balance');
                 return null;
             }
-            const availableBalance = parseFloat(usdtBalance.free);
+            const availableBalance = parseFloat(usdtBalance.walletBalance);
             const maxPositionValue = (availableBalance * this.maxPositionPercentage) / 100;
             const currentPrice = await this.binanceService.getSymbolPrice(symbol);
             const symbolInfo = await this.binanceService.getSymbolInfo(symbol);

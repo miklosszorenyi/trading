@@ -13,18 +13,29 @@ export declare class TradingController {
         message: string;
         error: any;
     }>;
-    getActiveOrders(): Promise<{
+    getOrdersAndPositions(): Promise<{
         success: boolean;
-        count: number;
-        positions: import("../common/interfaces/position.interface").Position[];
+        data: {
+            managedPositions: {
+                count: number;
+                positions: import("../common/interfaces/position.interface").Position[];
+            };
+            openOrders: {
+                count: any;
+                orders: any;
+            };
+            activePositions: {
+                count: any;
+                positions: any;
+            };
+        };
         message?: undefined;
         error?: undefined;
     } | {
         success: boolean;
         message: string;
         error: any;
-        count?: undefined;
-        positions?: undefined;
+        data?: undefined;
     }>;
     testEndpoint(): Promise<{
         success: boolean;
