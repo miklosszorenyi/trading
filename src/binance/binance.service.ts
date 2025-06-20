@@ -16,7 +16,7 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
   private orderUpdateCallback: ((data: any) => void) | null = null;
 
   private readonly baseURL = 'https://testnet.binancefuture.com';
-  private readonly wsBaseURL = 'wss://stream.binancefuture.com/ws';
+  private readonly wsBaseURL = 'wss://stream.binancefuture.com';
 
   constructor(private configService: ConfigService) {
     this.apiKey = this.configService.get<string>('BINANCE_API_KEY');
@@ -75,12 +75,12 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
   private async setupUserDataStream() {
     try {
       // Get listen key for user data stream
-      const response = await this.makeSignedRequest('POST', '/api/v3/userDataStream');
+      const response = await this.makeSignedRequest('POST', '/fapi/v1/listenKey');
       this.listenKey = response.listenKey;
       this.logger.log('🔑 User data stream listen key obtained');
 
-      // Setup WebSocket connection
-      const wsUrl = `${this.wsBaseURL}/${this.listenKey}`;
+      // Setup WebSocket connection - Futures testnet WebSocket URL
+      const wsUrl = `${this.wsBaseURL}/ws/${this.listenKey}`;
       this.userDataStream = new WebSocket(wsUrl);
 
       this.userDataStream.on('open', () => {
@@ -90,8 +90,8 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
       this.userDataStream.on('message', (data: WebSocket.Data) => {
         try {
           const message = JSON.parse(data.toString());
-          if (message.e === 'executionReport') {
-            this.handleOrderUpdate(message);
+          if (message.e === 'ORDER_TRADE_UPDATE') {
+            this.handleOrderUpdate(message.o);
           }
         } catch (error) {
           this.logger.error('❌ Error parsing WebSocket message', error);
@@ -111,7 +111,7 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
       // Keep alive the listen key every 30 minutes
       this.keepAliveInterval = setInterval(async () => {
         try {
-          await this.makeSignedRequest('PUT', '/api/v3/userDataStream', { listenKey: this.listenKey });
+          await this.makeSignedRequest('PUT', '/fapi/v1/listenKey');
           this.logger.debug('🔄 User data stream keep-alive sent');
         } catch (error) {
           this.logger.error('❌ Failed to keep alive user data stream', error);
@@ -137,8 +137,8 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
 
   async getAccountBalance(): Promise<any> {
     try {
-      const accountInfo = await this.makeSignedRequest('GET', '/api/v3/account');
-      return accountInfo.balances;
+      const accountInfo = await this.makeSignedRequest('GET', '/fapi/v2/account');
+      return accountInfo.assets;
     } catch (error) {
       this.logger.error('❌ Failed to get account balance', error);
       throw error;
@@ -147,7 +147,7 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
 
   async getSymbolPrice(symbol: string): Promise<number> {
     try {
-      const response = await this.httpClient.get(`/api/v3/ticker/price?symbol=${symbol}`);
+      const response = await this.httpClient.get(`/fapi/v1/ticker/price?symbol=${symbol}`);
       return parseFloat(response.data.price);
     } catch (error) {
       this.logger.error(`❌ Failed to get price for ${symbol}`, error);
@@ -157,7 +157,7 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
 
   async getSymbolInfo(symbol: string): Promise<any> {
     try {
-      const response = await this.httpClient.get('/api/v3/exchangeInfo');
+      const response = await this.httpClient.get('/fapi/v1/exchangeInfo');
       return response.data.symbols.find(s => s.symbol === symbol);
     } catch (error) {
       this.logger.error(`❌ Failed to get symbol info for ${symbol}`, error);
@@ -174,7 +174,7 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
         quantity,
       };
 
-      const order = await this.makeSignedRequest('POST', '/api/v3/order', params);
+      const order = await this.makeSignedRequest('POST', '/fapi/v1/order', params);
       this.logger.log(`✅ Market order placed: ${side} ${quantity} ${symbol} - OrderId: ${order.orderId}`);
       return order;
     } catch (error) {
@@ -193,7 +193,7 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
         stopPrice: stopPrice.toString(),
       };
 
-      const order = await this.makeSignedRequest('POST', '/api/v3/order', params);
+      const order = await this.makeSignedRequest('POST', '/fapi/v1/order', params);
       this.logger.log(`🛑 Stop loss order placed: ${quantity} ${symbol} at ${stopPrice} - OrderId: ${order.orderId}`);
       return order;
     } catch (error) {
@@ -212,7 +212,7 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
         stopPrice: stopPrice.toString(),
       };
 
-      const order = await this.makeSignedRequest('POST', '/api/v3/order', params);
+      const order = await this.makeSignedRequest('POST', '/fapi/v1/order', params);
       this.logger.log(`🎯 Take profit order placed: ${quantity} ${symbol} at ${stopPrice} - OrderId: ${order.orderId}`);
       return order;
     } catch (error) {
@@ -228,7 +228,7 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
         orderId,
       };
 
-      const result = await this.makeSignedRequest('DELETE', '/api/v3/order', params);
+      const result = await this.makeSignedRequest('DELETE', '/fapi/v1/order', params);
       this.logger.log(`❌ Order cancelled: ${symbol} OrderId: ${orderId}`);
       return result;
     } catch (error) {
@@ -248,7 +248,7 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
 
     if (this.listenKey) {
       try {
-        await this.makeSignedRequest('DELETE', '/api/v3/userDataStream', { listenKey: this.listenKey });
+        await this.makeSignedRequest('DELETE', '/fapi/v1/listenKey');
       } catch (error) {
         this.logger.error('❌ Failed to close user data stream', error);
       }
