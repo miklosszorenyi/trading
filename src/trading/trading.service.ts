@@ -45,8 +45,8 @@ export class TradingService implements OnModuleInit {
         throw new Error(`Symbol ${signal.symbol} not found`);
       }
 
-      // Calculate position size with proper precision
-      const quantity = await this.calculatePositionSize(signal.symbol, symbolInfo);
+      // Calculate position size with proper precision using signal high/low
+      const quantity = await this.calculatePositionSize(signal.symbol, symbolInfo, signal);
       if (!quantity) {
         throw new Error('Unable to calculate position size');
       }
@@ -129,7 +129,7 @@ export class TradingService implements OnModuleInit {
     }
   }
 
-  private async calculatePositionSize(symbol: string, symbolInfo?: any): Promise<number | null> {
+  private async calculatePositionSize(symbol: string, symbolInfo?: any, signal?: TradingViewWebhookDto): Promise<number | null> {
     try {
       // Get symbol info if not provided
       if (!symbolInfo) {
@@ -148,16 +148,26 @@ export class TradingService implements OnModuleInit {
       const availableBalance = parseFloat(usdtBalance.walletBalance);
       const maxPositionValue = (availableBalance * this.maxPositionPercentage) / 100;
 
-      // Get current price
-      const currentPrice = await this.binanceService.getSymbolPrice(symbol);
+      // Calculate reference price based on signal high/low or current price
+      let referencePrice: number;
+      
+      if (signal) {
+        // Use average of high and low from TradingView signal for more accurate position sizing
+        referencePrice = (signal.high + signal.low) / 2;
+        this.logger.log(`💡 Using signal reference price: ${referencePrice} (avg of ${signal.high} and ${signal.low})`);
+      } else {
+        // Fallback to current price if no signal provided
+        referencePrice = await this.binanceService.getSymbolPrice(symbol);
+        this.logger.log(`💡 Using current market price: ${referencePrice}`);
+      }
       
       // Get precision values
       const stepSize = getQuantityStepSize(symbolInfo);
       const minQty = getMinQuantity(symbolInfo);
       const maxQty = getMaxQuantity(symbolInfo);
       
-      // Calculate quantity
-      let quantity = maxPositionValue / currentPrice;
+      // Calculate quantity based on reference price
+      let quantity = maxPositionValue / referencePrice;
       
       // Round to step size with proper precision
       quantity = roundToPrecision(quantity, stepSize);
@@ -168,7 +178,7 @@ export class TradingService implements OnModuleInit {
         return null;
       }
 
-      this.logger.log(`💰 Position size calculated: ${quantity} ${symbol} (${maxPositionValue} USDT at ${currentPrice})`);
+      this.logger.log(`💰 Position size calculated: ${quantity} ${symbol} (${maxPositionValue} USDT at ${referencePrice})`);
       return quantity;
     } catch (error) {
       this.logger.error('❌ Failed to calculate position size', error);

@@ -37,7 +37,7 @@ let TradingService = TradingService_1 = class TradingService {
             if (!symbolInfo) {
                 throw new Error(`Symbol ${signal.symbol} not found`);
             }
-            const quantity = await this.calculatePositionSize(signal.symbol, symbolInfo);
+            const quantity = await this.calculatePositionSize(signal.symbol, symbolInfo, signal);
             if (!quantity) {
                 throw new Error('Unable to calculate position size');
             }
@@ -96,7 +96,7 @@ let TradingService = TradingService_1 = class TradingService {
             throw error;
         }
     }
-    async calculatePositionSize(symbol, symbolInfo) {
+    async calculatePositionSize(symbol, symbolInfo, signal) {
         try {
             if (!symbolInfo) {
                 symbolInfo = await this.binanceService.getSymbolInfo(symbol);
@@ -109,17 +109,25 @@ let TradingService = TradingService_1 = class TradingService {
             }
             const availableBalance = parseFloat(usdtBalance.walletBalance);
             const maxPositionValue = (availableBalance * this.maxPositionPercentage) / 100;
-            const currentPrice = await this.binanceService.getSymbolPrice(symbol);
+            let referencePrice;
+            if (signal) {
+                referencePrice = (signal.high + signal.low) / 2;
+                this.logger.log(`💡 Using signal reference price: ${referencePrice} (avg of ${signal.high} and ${signal.low})`);
+            }
+            else {
+                referencePrice = await this.binanceService.getSymbolPrice(symbol);
+                this.logger.log(`💡 Using current market price: ${referencePrice}`);
+            }
             const stepSize = (0, filter_utils_1.getQuantityStepSize)(symbolInfo);
             const minQty = (0, filter_utils_1.getMinQuantity)(symbolInfo);
             const maxQty = (0, filter_utils_1.getMaxQuantity)(symbolInfo);
-            let quantity = maxPositionValue / currentPrice;
+            let quantity = maxPositionValue / referencePrice;
             quantity = (0, precision_1.roundToPrecision)(quantity, stepSize);
             if (!(0, precision_1.validateRange)(quantity, minQty, maxQty)) {
                 this.logger.error(`❌ Calculated quantity ${quantity} is outside allowed range [${minQty}, ${maxQty}]`);
                 return null;
             }
-            this.logger.log(`💰 Position size calculated: ${quantity} ${symbol} (${maxPositionValue} USDT at ${currentPrice})`);
+            this.logger.log(`💰 Position size calculated: ${quantity} ${symbol} (${maxPositionValue} USDT at ${referencePrice})`);
             return quantity;
         }
         catch (error) {
