@@ -1,0 +1,26 @@
+import { OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+export declare class BinanceService implements OnModuleInit, OnModuleDestroy {
+    private configService;
+    private readonly logger;
+    private client;
+    private userDataStream;
+    private listenKey;
+    private keepAliveInterval;
+    private orderUpdateCallback;
+    constructor(configService: ConfigService);
+    onModuleInit(): Promise<void>;
+    onModuleDestroy(): Promise<void>;
+    private initializeBinanceClient;
+    private setupUserDataStream;
+    private handleOrderUpdate;
+    setOrderUpdateCallback(callback: (data: any) => void): void;
+    getAccountBalance(): Promise<any>;
+    getSymbolPrice(symbol: string): Promise<number>;
+    getSymbolInfo(symbol: string): Promise<any>;
+    placeMarketOrder(symbol: string, side: 'BUY' | 'SELL', quantity: string): Promise<any>;
+    placeStopLossOrder(symbol: string, side: 'BUY' | 'SELL', quantity: string, stopPrice: number): Promise<any>;
+    placeTakeProfitOrder(symbol: string, side: 'BUY' | 'SELL', quantity: string, stopPrice: number): Promise<any>;
+    cancelOrder(symbol: string, orderId: number): Promise<any>;
+    private cleanup;
+}
