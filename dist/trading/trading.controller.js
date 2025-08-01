@@ -23,14 +23,41 @@ let TradingController = TradingController_1 = class TradingController {
         this.logger = new common_1.Logger(TradingController_1.name);
     }
     async handleTradingViewWebhook(webhookData) {
-        this.logger.log(`📨 TradingView webhook received: ${JSON.stringify(webhookData)}`);
+        this.logger.log(`📨 TradingView webhook received (after pipe transformation): ${JSON.stringify(webhookData)}`);
         try {
-            await this.tradingService.processTradingSignal(webhookData);
+            const success = await this.tradingService.processTradingSignal(webhookData);
+            if (!success) {
+                throw new common_1.BadRequestException(`Symbol ${webhookData.symbol} already exists in open orders or positions`);
+            }
             return { success: true, message: 'Signal processed successfully' };
         }
         catch (error) {
             this.logger.error('❌ Failed to process trading signal', error);
-            return { success: false, message: 'Failed to process signal', error: error.message };
+            return {
+                success: false,
+                message: 'Failed to process signal',
+                error: error.message,
+            };
+        }
+    }
+    async fakeprice(fakePriceData) {
+        this.tradingService.priceInfoCallback(fakePriceData);
+    }
+    async stopOrder(orderId, body) {
+        const { symbol } = body;
+        try {
+            if (!(await this.tradingService.cancelOrder(symbol, orderId))) {
+                throw new common_1.NotFoundException(`Order with ID ${orderId} not found for symbol ${symbol}`);
+            }
+            return { success: true, message: 'Order stopped successfully' };
+        }
+        catch (error) {
+            this.logger.error('❌ Failed to stop order', error);
+            return {
+                success: false,
+                message: 'Failed to stop order',
+                error: error.message,
+            };
         }
     }
     async getOrdersAndPositions() {
@@ -40,58 +67,56 @@ let TradingController = TradingController_1 = class TradingController {
             return {
                 success: true,
                 data: {
-                    managedPositions: {
-                        count: data.managedPositions.length,
-                        positions: data.managedPositions
-                    },
                     openOrders: {
                         count: data.openOrders.length,
-                        orders: data.openOrders
+                        orders: data.openOrders,
                     },
                     activePositions: {
                         count: data.activePositions.length,
-                        positions: data.activePositions
-                    }
-                }
+                        positions: data.activePositions,
+                    },
+                },
             };
         }
         catch (error) {
             this.logger.error('❌ Failed to get orders and positions', error);
-            return { success: false, message: 'Failed to get orders and positions', error: error.message };
+            return {
+                success: false,
+                message: 'Failed to get orders and positions',
+                error: error.message,
+            };
         }
-    }
-    async testEndpoint() {
-        this.logger.log('🧪 Test endpoint called');
-        return {
-            success: true,
-            message: 'Trading backend is running',
-            timestamp: new Date().toISOString()
-        };
     }
 };
 exports.TradingController = TradingController;
 __decorate([
     (0, common_1.Post)('tradingview'),
-    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [tradingview_webhook_dto_1.TradingViewWebhookDto]),
     __metadata("design:returntype", Promise)
 ], TradingController.prototype, "handleTradingViewWebhook", null);
 __decorate([
+    (0, common_1.Post)('fakeprice'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], TradingController.prototype, "fakeprice", null);
+__decorate([
+    (0, common_1.Delete)('cancelOrder/:orderId'),
+    __param(0, (0, common_1.Param)('orderId')),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Object]),
+    __metadata("design:returntype", Promise)
+], TradingController.prototype, "stopOrder", null);
+__decorate([
     (0, common_1.Get)('info'),
-    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)
 ], TradingController.prototype, "getOrdersAndPositions", null);
-__decorate([
-    (0, common_1.Post)('test'),
-    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
-    __metadata("design:returntype", Promise)
-], TradingController.prototype, "testEndpoint", null);
 exports.TradingController = TradingController = TradingController_1 = __decorate([
     (0, common_1.Controller)('webhook'),
     __metadata("design:paramtypes", [trading_service_1.TradingService])

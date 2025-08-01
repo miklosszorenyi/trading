@@ -10,13 +10,13 @@
  */
 export function roundToPrecision(value: number, stepSize: number): number {
   if (stepSize === 0) return value;
-  
+
   // Calculate the number of decimal places in stepSize
   const decimals = stepSize.toString().split('.')[1]?.length || 0;
-  
+
   // Round to step size
   const rounded = Math.floor(value / stepSize) * stepSize;
-  
+
   // Return with proper decimal places
   return parseFloat(rounded.toFixed(decimals));
 }
@@ -27,13 +27,13 @@ export function roundToPrecision(value: number, stepSize: number): number {
  * @param stepSize - The step size for precision
  * @returns Formatted string
  */
-export function formatToPrecision(value: number, stepSize: number): string {
+export function formatToPrecision(value: number, stepSize: number): number {
   const rounded = roundToPrecision(value, stepSize);
-  
+
   // Calculate decimal places from stepSize
   const decimals = stepSize.toString().split('.')[1]?.length || 0;
-  
-  return rounded.toFixed(decimals);
+
+  return parseFloat(rounded.toFixed(decimals));
 }
 
 /**
@@ -43,6 +43,10 @@ export function formatToPrecision(value: number, stepSize: number): string {
  * @param maxValue - Maximum allowed value
  * @returns True if valid, false otherwise
  */
-export function validateRange(value: number, minValue: number, maxValue: number): boolean {
+export function validateRange(
+  value: number,
+  minValue: number,
+  maxValue: number,
+): boolean {
   return value >= minValue && value <= maxValue;
 }

@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsIn } from 'class-validator';
+import { IsString, IsNumber, IsIn, IsOptional } from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class TradingViewWebhookDto {
@@ -17,7 +17,8 @@ export class TradingViewWebhookDto {
   })
   @IsString()
   @IsIn(['BUY', 'SELL'])
-  type: 'BUY' | 'SELL';
+  @IsOptional()
+  type?: 'BUY' | 'SELL';
 
   @IsString()
   symbol: string;

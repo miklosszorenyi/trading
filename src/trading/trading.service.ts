@@ -1,43 +1,75 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BinanceService } from '../binance/binance.service';
-import { TradingViewWebhookDto } from '../common/dto/tradingview-webhook.dto';
-import { Position } from '../common/interfaces/position.interface';
-import { roundToPrecision, formatToPrecision, validateRange } from '../common/utils/precision';
-import { 
-  getQuantityStepSize, 
-  getPriceTickSize, 
-  getMinQuantity, 
+import {
+  Order,
+  OrderDTO,
+  PositionInfo,
+  RequestedOrder,
+} from './interfaces/trading.interface';
+import {
+  roundToPrecision,
+  formatToPrecision,
+  validateRange,
+} from '../common/utils/precision';
+import {
+  getQuantityStepSize,
+  getPriceTickSize,
+  getMinQuantity,
   getMaxQuantity,
   getMinPrice,
-  getMaxPrice
+  getMaxPrice,
 } from '../common/utils/filter-utils';
+import { TradingViewWebhookDto } from 'src/common/dto/tradingview-webhook.dto';
+import { SymbolStreamData } from 'src/binance/interfaces/symbol-stream.interface';
+import { StorageService } from 'src/storage/storage.service';
 
 @Injectable()
 export class TradingService implements OnModuleInit {
   private readonly logger = new Logger(TradingService.name);
-  private positions: Map<string, Position> = new Map();
   private readonly maxPositionPercentage: number;
+  private readonly maxLeverage: number;
+  private positionInfo: PositionInfo;
 
   constructor(
     private binanceService: BinanceService,
     private configService: ConfigService,
+    private storageService: StorageService,
   ) {
-    this.maxPositionPercentage = this.configService.get<number>('MAX_POSITION_PERCENTAGE', 2);
+    this.maxPositionPercentage = this.configService.get<number>(
+      'MAX_POSITION_PERCENTAGE',
+      2,
+    );
+    this.maxLeverage = this.configService.get<number>('MAX_LEVERAGE', 20);
   }
 
-  onModuleInit() {
+  async onModuleInit() {
     // Set up order update callback
     this.binanceService.setOrderUpdateCallback((data) => {
       this.handleOrderUpdate(data);
     });
 
-    this.logger.log(`🎯 Trading service initialized with ${this.maxPositionPercentage}% max position size`);
+    await this.getOrdersAndPositions();
+
+    this.binanceService.setPriceInfoCallback((data: SymbolStreamData) => {
+      this.priceInfoCallback(data);
+    });
+
+    this.logger.log(`🎯 Trading service initialized`);
   }
 
-  async processTradingSignal(signal: TradingViewWebhookDto): Promise<void> {
+  async processTradingSignal(signal: TradingViewWebhookDto): Promise<boolean> {
+    if (this.checkSymbolExists(signal.symbol)) {
+      this.logger.warn(
+        `⚠️ Symbol ${signal.symbol} already exists in open orders or positions`,
+      );
+      return false;
+    }
+
     try {
-      this.logger.log(`🔄 Processing ${signal.type} signal for ${signal.symbol}`);
+      this.logger.log(
+        `🔄 Processing ${signal.type} signal for ${signal.symbol}`,
+      );
 
       // Get symbol info for precision handling
       const symbolInfo = await this.binanceService.getSymbolInfo(signal.symbol);
@@ -46,278 +78,311 @@ export class TradingService implements OnModuleInit {
       }
 
       // Calculate position size with proper precision using signal high/low
-      const quantity = await this.calculatePositionSize(signal.symbol, symbolInfo, signal);
+      const quantity = await this.calculatePositionSize(
+        signal.symbol,
+        symbolInfo,
+        signal,
+      );
+
       if (!quantity) {
         throw new Error('Unable to calculate position size');
       }
 
       // Get current price for stop price calculation
-      const currentPrice = await this.binanceService.getSymbolPrice(signal.symbol);
-      
+      // const currentPrice = await this.binanceService.getSymbolPrice(signal.symbol);
+
       // Calculate stop price based on signal direction with proper precision
       const priceTickSize = getPriceTickSize(symbolInfo);
-      let stopPrice: number;
-      
-      if (signal.type === 'BUY') {
-        // For BUY signals, use a stop price slightly above current price
-        stopPrice = roundToPrecision(currentPrice * 1.001, priceTickSize);
-      } else {
-        // For SELL signals, use a stop price slightly below current price
-        stopPrice = roundToPrecision(currentPrice * 0.999, priceTickSize);
-      }
+      const stopPrice: number = roundToPrecision(
+        signal.type === 'BUY' ? signal.high : signal.low,
+        priceTickSize,
+      );
 
       // Validate price range
       const minPrice = getMinPrice(symbolInfo);
       const maxPrice = getMaxPrice(symbolInfo);
-      
-      if (!validateRange(stopPrice, minPrice, maxPrice)) {
-        throw new Error(`Stop price ${stopPrice} is outside allowed range [${minPrice}, ${maxPrice}]`);
-      }
 
-      // Create position record
-      const positionId = `${signal.symbol}_${Date.now()}`;
-      const position: Position = {
-        id: positionId,
-        symbol: signal.symbol,
-        side: signal.type,
-        quantity,
-        entryPrice: 0, // Will be updated when order fills
-        stopLoss: signal.low,
-        takeProfit: signal.high,
-        orderId: 0, // Will be updated after order placement
-        status: 'PENDING',
-        createdAt: new Date(),
-      };
+      if (!validateRange(stopPrice, minPrice, maxPrice)) {
+        throw new Error(
+          `Stop price ${stopPrice} is outside allowed range [${minPrice}, ${maxPrice}]`,
+        );
+      }
 
       // Place stop market order with properly formatted values
       const order = await this.binanceService.placeMarketOrder(
         signal.symbol,
         signal.type,
         formatToPrecision(quantity, getQuantityStepSize(symbolInfo)),
-        formatToPrecision(stopPrice, priceTickSize)
+        formatToPrecision(stopPrice, priceTickSize),
       );
 
-      position.orderId = order.orderId;
-      this.positions.set(positionId, position);
+      // position.orderId = order.orderId;
 
-      this.logger.log(`📈 Position created: ${positionId} - ${signal.type} ${quantity} ${signal.symbol} at stop price ${stopPrice}`);
+      this.logger.log(
+        `📈 Position created: ${signal.type} ${quantity} ${signal.symbol} at stop price ${stopPrice}`,
+      );
+
+      await this.setRequestedOrder({
+        orderId: order.orderId,
+        symbol: signal.symbol,
+        type: signal.type,
+        low: signal.low,
+        high: signal.high,
+        requestTime: new Date(),
+      });
+
+      await this.getOrdersAndPositions();
+
+      return true;
     } catch (error) {
       this.logger.error('❌ Failed to process trading signal', error);
+
       throw error;
     }
   }
 
-  async getOrdersAndPositions() {
+  async getOrdersAndPositions(): Promise<PositionInfo> {
     try {
-      // Memóriában tárolt pozíciók (TradingView signalokból)
-      const managedPositions = this.getActivePositions();
-      
       // Binance API-ból lekért adatok
-      const [openOrders, activePositions] = await Promise.all([
+      const [openOrders, activePositions, requestedOrders] = await Promise.all([
         this.binanceService.getOpenOrders(),
-        this.binanceService.getPositions()
+        this.binanceService.getPositions(),
+        this.getRequestedOrders(),
       ]);
 
-      return {
-        managedPositions,
+      this.positionInfo = {
         openOrders,
-        activePositions
+        activePositions,
+        requestedOrders,
       };
+
+      this.binanceService.addSymbolsToWatch([
+        ...this.positionInfo.openOrders.map((p) => p.symbol),
+        ...this.positionInfo.activePositions.map((p) => p.symbol),
+      ]);
+
+      return this.positionInfo;
     } catch (error) {
       this.logger.error('❌ Failed to get orders and positions', error);
       throw error;
     }
   }
 
-  private async calculatePositionSize(symbol: string, symbolInfo?: any, signal?: TradingViewWebhookDto): Promise<number | null> {
+  async cancelOrder(symbol: string, orderId: number): Promise<boolean> {
+    if (
+      !this.positionInfo.openOrders.some(
+        (order) => order.symbol === symbol && order.orderId === orderId,
+      )
+    ) {
+      this.logger.warn(
+        `⚠️ Order ${orderId} for ${symbol} not found in open orders`,
+      );
+      return false;
+    }
+
     try {
-      // Get symbol info if not provided
-      if (!symbolInfo) {
-        symbolInfo = await this.binanceService.getSymbolInfo(symbol);
-      }
-
-      // Get account balance
-      const balances = await this.binanceService.getAccountBalance();
-      const usdtBalance = balances.find(b => b.asset === 'USDT');
-      
-      if (!usdtBalance || parseFloat(usdtBalance.walletBalance) <= 0) {
-        this.logger.error('❌ Insufficient USDT balance');
-        return null;
-      }
-
-      const availableBalance = parseFloat(usdtBalance.walletBalance);
-      const maxPositionValue = (availableBalance * this.maxPositionPercentage) / 100;
-
-      // Calculate reference price based on signal high/low or current price
-      let referencePrice: number;
-      
-      if (signal) {
-        // Use average of high and low from TradingView signal for more accurate position sizing
-        referencePrice = (signal.high + signal.low) / 2;
-        this.logger.log(`💡 Using signal reference price: ${referencePrice} (avg of ${signal.high} and ${signal.low})`);
-      } else {
-        // Fallback to current price if no signal provided
-        referencePrice = await this.binanceService.getSymbolPrice(symbol);
-        this.logger.log(`💡 Using current market price: ${referencePrice}`);
-      }
-      
-      // Get precision values
-      const stepSize = getQuantityStepSize(symbolInfo);
-      const minQty = getMinQuantity(symbolInfo);
-      const maxQty = getMaxQuantity(symbolInfo);
-      
-      // Calculate quantity based on reference price
-      let quantity = maxPositionValue / referencePrice;
-      
-      // Round to step size with proper precision
-      quantity = roundToPrecision(quantity, stepSize);
-      
-      // Validate quantity range
-      if (!validateRange(quantity, minQty, maxQty)) {
-        this.logger.error(`❌ Calculated quantity ${quantity} is outside allowed range [${minQty}, ${maxQty}]`);
-        return null;
-      }
-
-      this.logger.log(`💰 Position size calculated: ${quantity} ${symbol} (${maxPositionValue} USDT at ${referencePrice})`);
-      return quantity;
+      this.logger.log(`🛑 Cancelling order ${orderId} for ${symbol}`);
+      await this.binanceService.cancelOrder(symbol, orderId);
+      // await this.getOrdersAndPositions();
+      return true;
     } catch (error) {
-      this.logger.error('❌ Failed to calculate position size', error);
+      this.logger.error(
+        `❌ Failed to cancel order ${orderId} for ${symbol}`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  async setRequestedOrder(order: RequestedOrder): Promise<void> {
+    const currentOrders = await this.getRequestedOrders();
+    currentOrders.push(order);
+    return await this.storageService.setData('requestedOrders', currentOrders);
+  }
+
+  async getRequestedOrders(): Promise<RequestedOrder[]> {
+    return ((await this.storageService.getData('requestedOrders')) ||
+      []) as RequestedOrder[];
+  }
+
+  async getRequestedOrder(
+    orderId: number,
+  ): Promise<RequestedOrder | undefined> {
+    const currentOrders = await this.getRequestedOrders();
+    return currentOrders.find((o) => o.orderId === orderId);
+  }
+
+  async removeRequestedOrders(order: RequestedOrder): Promise<void> {
+    const currentOrders = await this.getRequestedOrders();
+    const updatedOrders = currentOrders.filter(
+      (o) => o.orderId !== order.orderId,
+    );
+    await this.storageService.setData('requestedOrders', updatedOrders);
+  }
+
+  private async calculatePositionSize(
+    symbol: string,
+    symbolInfo?: any,
+    signal?: TradingViewWebhookDto,
+  ): Promise<number | null> {
+    // Get account balance
+    const balances = await this.binanceService.getAccountBalance();
+    const usdtBalance =
+      balances.find((b) => b.asset === 'USDT')?.walletBalance || '0';
+
+    if (!usdtBalance) {
+      this.logger.error('❌ Insufficient USDT balance');
       return null;
     }
+
+    // Get precision values
+    const stepSize = getQuantityStepSize(symbolInfo);
+    const minQty = getMinQuantity(symbolInfo);
+    const maxQty = getMaxQuantity(symbolInfo);
+
+    // Round to step size with proper precision
+    const quantity = roundToPrecision(
+      (usdtBalance * (this.maxPositionPercentage / 100)) /
+        (signal.high - signal.low),
+      stepSize,
+    );
+
+    // Validate quantity range
+    if (!validateRange(quantity, minQty, maxQty)) {
+      this.logger.error(
+        `❌ Calculated quantity ${quantity} is outside allowed range [${minQty}, ${maxQty}]`,
+      );
+      return null;
+    }
+
+    const requiredLeverage = Math.ceil(
+      (quantity * signal.high) / parseFloat(usdtBalance),
+    );
+
+    if (requiredLeverage > this.maxLeverage) {
+      this.logger.error(
+        `❌ Required leverage ${requiredLeverage} exceeds max allowed ${this.maxLeverage}`,
+      );
+      return null;
+    } else {
+      await this.binanceService.setLeverage(symbol, requiredLeverage);
+    }
+
+    return quantity;
   }
 
   private async handleOrderUpdate(data: any): Promise<void> {
     try {
-      const orderId = data.i;
       const symbol = data.s;
-      const status = data.X; // Order status
-      const side = data.S;
-      const executedQty = parseFloat(data.z);
-      const avgPrice = parseFloat(data.Z) / executedQty || 0;
-
-      this.logger.log(`📊 Order update: ${symbol} ${side} ${status} - OrderId: ${orderId}`);
-
-      // Find position by order ID
-      const position = Array.from(this.positions.values()).find(p => 
-        p.orderId === orderId || 
-        p.stopLossOrderId === orderId || 
-        p.takeProfitOrderId === orderId
+      const status = data.X;
+      const orderId = data.i;
+      const filledQuantity = data.l;
+      const orderData = this.positionInfo.openOrders.find(
+        (o) => o.orderId === orderId && o.symbol === symbol,
       );
 
-      if (!position) {
-        this.logger.debug(`🔍 No position found for order ${orderId}`);
-        return;
-      }
-
-      // Handle initial stop market order fill
-      if (position.orderId === orderId && status === 'FILLED' && position.status === 'PENDING') {
-        position.status = 'FILLED';
-        position.entryPrice = avgPrice;
-        position.filledAt = new Date();
-
-        this.logger.log(`✅ Position filled: ${position.id} at ${avgPrice}`);
-
-        // Place SL and TP orders
-        await this.placeSLTPOrders(position);
-      }
-
-      // Handle SL/TP order fills
-      if ((position.stopLossOrderId === orderId || position.takeProfitOrderId === orderId) && status === 'FILLED') {
-        position.status = 'CLOSED';
-        
-        const orderType = position.stopLossOrderId === orderId ? 'Stop Loss' : 'Take Profit';
-        this.logger.log(`🎯 ${orderType} executed for position ${position.id}`);
-
-        // Cancel the other pending order
-        if (position.stopLossOrderId === orderId && position.takeProfitOrderId) {
-          await this.binanceService.cancelOrder(position.symbol, position.takeProfitOrderId);
-        } else if (position.takeProfitOrderId === orderId && position.stopLossOrderId) {
-          await this.binanceService.cancelOrder(position.symbol, position.stopLossOrderId);
+      if (status === 'FILLED') {
+        if (orderData.closePosition) {
+          this.closeRelatedOrders(symbol, orderId);
+        } else {
+          this.placeSLTPOrders(symbol, filledQuantity, orderId);
         }
-
-        // Remove position from memory
-        this.positions.delete(position.id);
       }
 
+      await this.getOrdersAndPositions();
     } catch (error) {
       this.logger.error('❌ Error handling order update', error);
     }
   }
 
-  private async placeSLTPOrders(position: Position): Promise<void> {
-    try {
-      // Get symbol info for precision handling
-      const symbolInfo = await this.binanceService.getSymbolInfo(position.symbol);
-      if (!symbolInfo) {
-        throw new Error(`Symbol ${position.symbol} not found`);
+  /*private*/
+  priceInfoCallback(data: SymbolStreamData): void {
+    this.logger.log(`📈 Price update for ${data.symbol}: ${data.price}`);
+
+    this.positionInfo.openOrders.forEach(async (order: Order) => {
+      const { symbol, side, orderId, closePosition } = order;
+      const relatedOrder: RequestedOrder =
+        this.positionInfo.requestedOrders.find((o) => o.orderId === orderId);
+
+      if (relatedOrder) {
+        let exitPrice = side === 'BUY' ? relatedOrder.low : relatedOrder.high;
+        const { price } = data;
+
+        if (symbol === data.symbol) {
+          if (
+            !closePosition &&
+            ((side === 'BUY' && price < exitPrice) ||
+              (side === 'SELL' && price > exitPrice))
+          ) {
+            this.logger.log(
+              `🛑 Cancelling order ${orderId} for ${symbol} because price moved against position`,
+            );
+            this.binanceService.cancelOrder(symbol, orderId);
+            await this.getOrdersAndPositions();
+          }
+        }
       }
+    });
+  }
 
-      const priceTickSize = getPriceTickSize(symbolInfo);
-      const quantityStepSize = getQuantityStepSize(symbolInfo);
-      
-      // Calculate SL and TP prices based on entry price and signal levels
-      const entryPrice = position.entryPrice;
-      let stopLossPrice: number;
-      let takeProfitPrice: number;
+  private async placeSLTPOrders(
+    symbol: string,
+    filledQuantity: number,
+    orderId: number,
+  ): Promise<void> {
+    const symbolInfo = await this.binanceService.getSymbolInfo(symbol);
 
-      if (position.side === 'BUY') {
-        // For long positions
-        stopLossPrice = Math.min(position.stopLoss, entryPrice * 0.98); // Max 2% loss
-        takeProfitPrice = Math.max(position.takeProfit, entryPrice * 1.04); // Min 4% profit
-      } else {
-        // For short positions
-        stopLossPrice = Math.max(position.stopLoss, entryPrice * 1.02); // Max 2% loss
-        takeProfitPrice = Math.min(position.takeProfit, entryPrice * 0.96); // Min 4% profit
-      }
+    const priceTickSize = getPriceTickSize(symbolInfo);
 
-      // Apply precision to prices
-      stopLossPrice = roundToPrecision(stopLossPrice, priceTickSize);
-      takeProfitPrice = roundToPrecision(takeProfitPrice, priceTickSize);
+    // place TP order
+    const order = await this.getRequestedOrder(orderId);
+    const takeProfitPrice = roundToPrecision(
+      order.type === 'BUY'
+        ? order.high + (order.high - order.low) * 2
+        : order.low - (order.high - order.low) * 2,
+      priceTickSize,
+    );
+    const stopLossPrice = roundToPrecision(
+      order.type === 'BUY' ? order.low : order.high,
+      priceTickSize,
+    );
 
-      // Validate price ranges
-      const minPrice = getMinPrice(symbolInfo);
-      const maxPrice = getMaxPrice(symbolInfo);
-      
-      if (!validateRange(stopLossPrice, minPrice, maxPrice)) {
-        throw new Error(`Stop loss price ${stopLossPrice} is outside allowed range`);
-      }
-      
-      if (!validateRange(takeProfitPrice, minPrice, maxPrice)) {
-        throw new Error(`Take profit price ${takeProfitPrice} is outside allowed range`);
-      }
+    await this.binanceService.placeTakeProfitOrder(
+      symbol,
+      order.type,
+      filledQuantity,
+      takeProfitPrice,
+    );
 
-      // Place stop loss order with proper formatting
-      const slOrder = await this.binanceService.placeStopLossOrder(
-        position.symbol,
-        position.side,
-        formatToPrecision(position.quantity, quantityStepSize),
-        formatToPrecision(stopLossPrice, priceTickSize)
+    // place SL order
+    await this.binanceService.placeStopLossOrder(
+      symbol,
+      order.type,
+      filledQuantity,
+      stopLossPrice,
+    );
+  }
+
+  private checkSymbolExists(symbol: string): boolean {
+    return (
+      this.positionInfo.openOrders.some((o) => o.symbol === symbol) ||
+      this.positionInfo.activePositions.some((p) => p.symbol === symbol)
+    );
+  }
+
+  private closeRelatedOrders(symbol: string, orderId: number): void {
+    const relatedOrders = this.positionInfo.openOrders.filter(
+      (openOrder) =>
+        openOrder.symbol === symbol &&
+        openOrder.closePosition &&
+        openOrder.orderId !== orderId,
+    );
+
+    for (const relatedOrder of relatedOrders) {
+      this.binanceService.cancelOrder(symbol, relatedOrder.orderId);
+      this.logger.log(
+        `🛑 Cancelled related order ${relatedOrder.orderId} for ${symbol}`,
       );
-      position.stopLossOrderId = slOrder.orderId;
-
-      // Place take profit order with proper formatting
-      const tpOrder = await this.binanceService.placeTakeProfitOrder(
-        position.symbol,
-        position.side,
-        formatToPrecision(position.quantity, quantityStepSize),
-        formatToPrecision(takeProfitPrice, priceTickSize)
-      );
-      position.takeProfitOrderId = tpOrder.orderId;
-
-      this.logger.log(`🎯 SL/TP orders placed for ${position.id}: SL@${stopLossPrice}, TP@${takeProfitPrice}`);
-
-    } catch (error) {
-      this.logger.error(`❌ Failed to place SL/TP orders for position ${position.id}`, error);
-      throw error;
     }
-  }
-
-  // Utility methods for monitoring
-  getActivePositions(): Position[] {
-    return Array.from(this.positions.values());
-  }
-
-  getPositionById(id: string): Position | undefined {
-    return this.positions.get(id);
   }
 }

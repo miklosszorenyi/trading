@@ -1,25 +1,31 @@
 import { OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BinanceService } from '../binance/binance.service';
-import { TradingViewWebhookDto } from '../common/dto/tradingview-webhook.dto';
-import { Position } from '../common/interfaces/position.interface';
+import { PositionInfo, RequestedOrder } from './interfaces/trading.interface';
+import { TradingViewWebhookDto } from 'src/common/dto/tradingview-webhook.dto';
+import { SymbolStreamData } from 'src/binance/interfaces/symbol-stream.interface';
+import { StorageService } from 'src/storage/storage.service';
 export declare class TradingService implements OnModuleInit {
     private binanceService;
     private configService;
+    private storageService;
     private readonly logger;
-    private positions;
     private readonly maxPositionPercentage;
-    constructor(binanceService: BinanceService, configService: ConfigService);
-    onModuleInit(): void;
-    processTradingSignal(signal: TradingViewWebhookDto): Promise<void>;
-    getOrdersAndPositions(): Promise<{
-        managedPositions: Position[];
-        openOrders: any;
-        activePositions: any;
-    }>;
+    private readonly maxLeverage;
+    private positionInfo;
+    constructor(binanceService: BinanceService, configService: ConfigService, storageService: StorageService);
+    onModuleInit(): Promise<void>;
+    processTradingSignal(signal: TradingViewWebhookDto): Promise<boolean>;
+    getOrdersAndPositions(): Promise<PositionInfo>;
+    cancelOrder(symbol: string, orderId: number): Promise<boolean>;
+    setRequestedOrder(order: RequestedOrder): Promise<void>;
+    getRequestedOrders(): Promise<RequestedOrder[]>;
+    getRequestedOrder(orderId: number): Promise<RequestedOrder | undefined>;
+    removeRequestedOrders(order: RequestedOrder): Promise<void>;
     private calculatePositionSize;
     private handleOrderUpdate;
+    priceInfoCallback(data: SymbolStreamData): void;
     private placeSLTPOrders;
-    getActivePositions(): Position[];
-    getPositionById(id: string): Position | undefined;
+    private checkSymbolExists;
+    private closeRelatedOrders;
 }

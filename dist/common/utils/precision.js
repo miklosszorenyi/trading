@@ -13,7 +13,7 @@ function roundToPrecision(value, stepSize) {
 function formatToPrecision(value, stepSize) {
     const rounded = roundToPrecision(value, stepSize);
     const decimals = stepSize.toString().split('.')[1]?.length || 0;
-    return rounded.toFixed(decimals);
+    return parseFloat(rounded.toFixed(decimals));
 }
 function validateRange(value, minValue, maxValue) {
     return value >= minValue && value <= maxValue;

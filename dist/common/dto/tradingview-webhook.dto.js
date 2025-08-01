@@ -33,6 +33,7 @@ __decorate([
     }),
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsIn)(['BUY', 'SELL']),
+    (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], TradingViewWebhookDto.prototype, "type", void 0);
 __decorate([

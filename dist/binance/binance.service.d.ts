@@ -1,5 +1,7 @@
 import { OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { SymbolStreamData } from './interfaces/symbol-stream.interface';
+import { OrderDTO } from 'src/trading/interfaces/trading.interface';
 export declare class BinanceService implements OnModuleInit, OnModuleDestroy {
     private configService;
     private readonly logger;
@@ -10,24 +12,32 @@ export declare class BinanceService implements OnModuleInit, OnModuleDestroy {
     private listenKey;
     private keepAliveInterval;
     private orderUpdateCallback;
+    private priceInfoCallback;
+    private symbolStreams;
     private readonly baseURL;
     private readonly wsBaseURL;
     constructor(configService: ConfigService);
     onModuleInit(): Promise<void>;
     onModuleDestroy(): Promise<void>;
-    private createSignature;
-    private makeSignedRequest;
-    private setupUserDataStream;
-    private handleOrderUpdate;
     setOrderUpdateCallback(callback: (data: any) => void): void;
+    setPriceInfoCallback(callback: (data: SymbolStreamData) => void): void;
     getAccountBalance(): Promise<any>;
     getOpenOrders(symbol?: string): Promise<any>;
     getPositions(): Promise<any>;
     getSymbolPrice(symbol: string): Promise<number>;
     getSymbolInfo(symbol: string): Promise<any>;
-    placeMarketOrder(symbol: string, side: 'BUY' | 'SELL', quantity: string, stopPrice: string): Promise<any>;
-    placeStopLossOrder(symbol: string, side: 'BUY' | 'SELL', quantity: string, stopPrice: string): Promise<any>;
-    placeTakeProfitOrder(symbol: string, side: 'BUY' | 'SELL', quantity: string, stopPrice: string): Promise<any>;
+    placeMarketOrder(symbol: string, side: 'BUY' | 'SELL', quantity: number, stopPrice: number): Promise<OrderDTO>;
+    placeStopLossOrder(symbol: string, side: 'BUY' | 'SELL', quantity: number, stopPrice: number): Promise<OrderDTO>;
+    placeTakeProfitOrder(symbol: string, side: 'BUY' | 'SELL', quantity: number, stopPrice: number): Promise<OrderDTO>;
     cancelOrder(symbol: string, orderId: number): Promise<any>;
+    setLeverage(symbol: string, leverage: number): Promise<any>;
+    addSymbolsToWatch(symbols: string[]): Promise<void>;
+    private removeSymbolsFromWatch;
+    private updateSymbolData;
+    private createSignature;
+    private makeSignedRequest;
+    private setupPriceDataStream;
+    private setupUserDataStream;
+    private handleOrderUpdate;
     private cleanup;
 }

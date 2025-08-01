@@ -24,6 +24,8 @@ let BinanceService = BinanceService_1 = class BinanceService {
         this.listenKey = null;
         this.keepAliveInterval = null;
         this.orderUpdateCallback = null;
+        this.priceInfoCallback = null;
+        this.symbolStreams = {};
         this.baseURL = 'https://testnet.binancefuture.com';
         this.wsBaseURL = 'wss://stream.binancefuture.com';
         this.apiKey = this.configService.get('BINANCE_API_KEY');
@@ -44,6 +46,201 @@ let BinanceService = BinanceService_1 = class BinanceService {
     }
     async onModuleDestroy() {
         await this.cleanup();
+    }
+    setOrderUpdateCallback(callback) {
+        this.orderUpdateCallback = callback;
+    }
+    setPriceInfoCallback(callback) {
+        this.priceInfoCallback = callback;
+    }
+    async getAccountBalance() {
+        try {
+            const accountInfo = await this.makeSignedRequest('GET', '/fapi/v2/account');
+            return accountInfo.assets;
+        }
+        catch (error) {
+            this.logger.error('❌ Failed to get account balance', error);
+            throw error;
+        }
+    }
+    async getOpenOrders(symbol) {
+        try {
+            const params = symbol ? { symbol } : {};
+            const orders = await this.makeSignedRequest('GET', '/fapi/v1/openOrders', params);
+            return orders.map((order) => ({
+                ...order,
+                price: parseFloat(order.price),
+                avgPrice: parseFloat(order.avgPrice),
+                origQty: parseFloat(order.origQty),
+                executedQty: parseFloat(order.executedQty),
+                cumQuote: parseFloat(order.cumQuote),
+            }));
+        }
+        catch (error) {
+            this.logger.error('❌ Failed to get open orders', error);
+            throw error;
+        }
+    }
+    async getPositions() {
+        try {
+            const positions = await this.makeSignedRequest('GET', '/fapi/v2/positionRisk');
+            return positions
+                .filter((pos) => parseFloat(pos.positionAmt) !== 0)
+                .map((position) => ({
+                ...position,
+                entryPrice: parseFloat(position.entryPrice),
+                breakEvenPrice: parseFloat(position.entryPrice),
+                isAutoAddMargin: position.isAutoAddMargin === 'true' ? true : false,
+                isolatedMargin: parseFloat(position.isolatedMargin),
+                leverage: parseInt(position.leverage),
+                liquidationPrice: parseFloat(position.liquidationPrice),
+                markPrice: parseFloat(position.markPrice),
+                maxNotionalValue: parseFloat(position.maxNotionalValue),
+                positionAmt: parseFloat(position.positionAmt),
+                notional: parseFloat(position.notional),
+                isolatedWallet: parseFloat(position.isolatedWallet),
+                unRealizedProfit: parseFloat(position.unRealizedProfit),
+            }));
+        }
+        catch (error) {
+            this.logger.error('❌ Failed to get positions', error);
+            throw error;
+        }
+    }
+    async getSymbolPrice(symbol) {
+        try {
+            const response = await this.httpClient.get(`/fapi/v1/ticker/price?symbol=${symbol}`);
+            return parseFloat(response.data.price);
+        }
+        catch (error) {
+            this.logger.error(`❌ Failed to get price for ${symbol}`, error);
+            throw error;
+        }
+    }
+    async getSymbolInfo(symbol) {
+        try {
+            const response = await this.httpClient.get('/fapi/v1/exchangeInfo');
+            return response.data.symbols.find((s) => s.symbol === symbol);
+        }
+        catch (error) {
+            this.logger.error(`❌ Failed to get symbol info for ${symbol}`, error);
+            throw error;
+        }
+    }
+    async placeMarketOrder(symbol, side, quantity, stopPrice) {
+        try {
+            const params = {
+                symbol,
+                side,
+                type: 'STOP_MARKET',
+                quantity,
+                stopPrice,
+            };
+            const order = await this.makeSignedRequest('POST', '/fapi/v1/order', params);
+            this.logger.log(`✅ Stop market order placed: ${side} ${quantity} ${symbol} at ${stopPrice} - OrderId: ${order.orderId}`);
+            return order;
+        }
+        catch (error) {
+            this.logger.error(`❌ Failed to place stop market order: ${side} ${quantity} ${symbol} at ${stopPrice}`, error);
+            throw error;
+        }
+    }
+    async placeStopLossOrder(symbol, side, quantity, stopPrice) {
+        try {
+            const params = {
+                symbol,
+                side: side === 'BUY' ? 'SELL' : 'BUY',
+                type: 'STOP_MARKET',
+                stopPrice,
+                closePosition: true,
+            };
+            const order = await this.makeSignedRequest('POST', '/fapi/v1/order', params);
+            this.logger.log(`✅ Stop loss order placed: ${quantity} ${symbol} at ${stopPrice} - OrderId: ${order.orderId}`);
+            return order;
+        }
+        catch (error) {
+            this.logger.error(`❌ Failed to place stop loss order: ${symbol} at ${stopPrice}`, error);
+            throw error;
+        }
+    }
+    async placeTakeProfitOrder(symbol, side, quantity, stopPrice) {
+        try {
+            const params = {
+                symbol,
+                side: side === 'BUY' ? 'SELL' : 'BUY',
+                type: 'TAKE_PROFIT_MARKET',
+                stopPrice,
+                closePosition: true,
+            };
+            const order = await this.makeSignedRequest('POST', '/fapi/v1/order', params);
+            this.logger.log(`🎯 Take profit order placed: ${quantity} ${symbol} at ${stopPrice} - OrderId: ${order.orderId}`);
+            return order;
+        }
+        catch (error) {
+            this.logger.error(`❌ Failed to place take profit order: ${symbol} at ${stopPrice}`, error);
+            throw error;
+        }
+    }
+    async cancelOrder(symbol, orderId) {
+        this.logger.log(`Cancelling order: ${symbol} OrderId: ${orderId}`);
+        try {
+            const params = {
+                symbol,
+                orderId,
+            };
+            const result = await this.makeSignedRequest('DELETE', '/fapi/v1/order', params);
+            this.logger.log(`❌ Order cancelled: ${symbol} OrderId: ${orderId}`);
+            return result;
+        }
+        catch (error) {
+            this.logger.error(`❌ Failed to cancel order: ${symbol} OrderId: ${orderId}`, error);
+        }
+    }
+    async setLeverage(symbol, leverage) {
+        try {
+            const params = {
+                symbol,
+                leverage,
+            };
+            const result = await this.makeSignedRequest('POST', '/fapi/v1/leverage', params);
+            this.logger.log(`✅ Leverage set for ${symbol}: ${leverage}`);
+            return result;
+        }
+        catch (error) {
+            this.logger.error(`❌ Failed to set leverage for ${symbol}: ${leverage}`, error);
+            throw error;
+        }
+    }
+    async addSymbolsToWatch(symbols) {
+        for (const symbol of symbols) {
+            if (!this.symbolStreams[symbol]) {
+                const stream = await this.setupPriceDataStream(symbol);
+                if (stream) {
+                    this.symbolStreams[symbol] = {
+                        stream,
+                        data: {
+                            symbol: null,
+                            price: null,
+                        },
+                    };
+                    this.logger.log(`🟢 Started watching symbol: ${symbol}`);
+                }
+            }
+        }
+    }
+    removeSymbolsFromWatch(symbols) {
+        symbols.forEach((symbol) => {
+            if (this.symbolStreams[symbol]) {
+                this.symbolStreams[symbol].stream?.close();
+                delete this.symbolStreams[symbol];
+                this.logger.log(`🔴 Stopped watching symbol: ${symbol}`);
+            }
+        });
+    }
+    updateSymbolData(symbol, price) {
+        if (this.symbolStreams[symbol]) {
+            this.symbolStreams[symbol].data = { symbol, price };
+        }
     }
     createSignature(queryString) {
         return crypto
@@ -70,6 +267,39 @@ let BinanceService = BinanceService_1 = class BinanceService {
             this.logger.error(`❌ API request failed: ${method} ${endpoint}`, error.response?.data || error.message);
             throw error;
         }
+    }
+    async setupPriceDataStream(symbol) {
+        try {
+            const wsUrl = `${this.wsBaseURL}/ws/${symbol.toLocaleLowerCase()}@markPrice`;
+            const priceStream = new WebSocket(wsUrl);
+            priceStream.on('open', () => {
+                this.logger.log('📡 Price data stream connected');
+            });
+            priceStream.on('message', (data) => {
+                try {
+                    const message = JSON.parse(data.toString());
+                    this.updateSymbolData(message.s, parseFloat(message.p));
+                    if (this.priceInfoCallback) {
+                        this.priceInfoCallback(this.symbolStreams[message.s]?.data);
+                    }
+                }
+                catch (error) {
+                    this.logger.error('❌ Error parsing price data stream message', error);
+                }
+            });
+            priceStream.on('error', (error) => {
+                this.logger.error('❌ Price data stream error', error);
+            });
+            priceStream.on('close', () => {
+                this.logger.warn('⚠️ Price data stream disconnected');
+                setTimeout(() => this.setupPriceDataStream(symbol), 5000);
+            });
+            return priceStream;
+        }
+        catch (error) {
+            this.logger.error('❌ Failed to setup price data stream', error);
+        }
+        return null;
     }
     async setupUserDataStream() {
         try {
@@ -119,129 +349,6 @@ let BinanceService = BinanceService_1 = class BinanceService {
             this.orderUpdateCallback(data);
         }
     }
-    setOrderUpdateCallback(callback) {
-        this.orderUpdateCallback = callback;
-    }
-    async getAccountBalance() {
-        try {
-            const accountInfo = await this.makeSignedRequest('GET', '/fapi/v2/account');
-            return accountInfo.assets;
-        }
-        catch (error) {
-            this.logger.error('❌ Failed to get account balance', error);
-            throw error;
-        }
-    }
-    async getOpenOrders(symbol) {
-        try {
-            const params = symbol ? { symbol } : {};
-            const orders = await this.makeSignedRequest('GET', '/fapi/v1/openOrders', params);
-            return orders;
-        }
-        catch (error) {
-            this.logger.error('❌ Failed to get open orders', error);
-            throw error;
-        }
-    }
-    async getPositions() {
-        try {
-            const positions = await this.makeSignedRequest('GET', '/fapi/v2/positionRisk');
-            return positions.filter(pos => parseFloat(pos.positionAmt) !== 0);
-        }
-        catch (error) {
-            this.logger.error('❌ Failed to get positions', error);
-            throw error;
-        }
-    }
-    async getSymbolPrice(symbol) {
-        try {
-            const response = await this.httpClient.get(`/fapi/v1/ticker/price?symbol=${symbol}`);
-            return parseFloat(response.data.price);
-        }
-        catch (error) {
-            this.logger.error(`❌ Failed to get price for ${symbol}`, error);
-            throw error;
-        }
-    }
-    async getSymbolInfo(symbol) {
-        try {
-            const response = await this.httpClient.get('/fapi/v1/exchangeInfo');
-            return response.data.symbols.find(s => s.symbol === symbol);
-        }
-        catch (error) {
-            this.logger.error(`❌ Failed to get symbol info for ${symbol}`, error);
-            throw error;
-        }
-    }
-    async placeMarketOrder(symbol, side, quantity, stopPrice) {
-        try {
-            const params = {
-                symbol,
-                side,
-                type: 'STOP_MARKET',
-                quantity,
-                stopPrice,
-            };
-            const order = await this.makeSignedRequest('POST', '/fapi/v1/order', params);
-            this.logger.log(`✅ Stop market order placed: ${side} ${quantity} ${symbol} at ${stopPrice} - OrderId: ${order.orderId}`);
-            return order;
-        }
-        catch (error) {
-            this.logger.error(`❌ Failed to place stop market order: ${side} ${quantity} ${symbol} at ${stopPrice}`, error);
-            throw error;
-        }
-    }
-    async placeStopLossOrder(symbol, side, quantity, stopPrice) {
-        try {
-            const params = {
-                symbol,
-                side: side === 'BUY' ? 'SELL' : 'BUY',
-                type: 'STOP_MARKET',
-                quantity,
-                stopPrice,
-            };
-            const order = await this.makeSignedRequest('POST', '/fapi/v1/order', params);
-            this.logger.log(`🛑 Stop loss order placed: ${quantity} ${symbol} at ${stopPrice} - OrderId: ${order.orderId}`);
-            return order;
-        }
-        catch (error) {
-            this.logger.error(`❌ Failed to place stop loss order: ${symbol} at ${stopPrice}`, error);
-            throw error;
-        }
-    }
-    async placeTakeProfitOrder(symbol, side, quantity, stopPrice) {
-        try {
-            const params = {
-                symbol,
-                side: side === 'BUY' ? 'SELL' : 'BUY',
-                type: 'TAKE_PROFIT_MARKET',
-                quantity,
-                stopPrice,
-            };
-            const order = await this.makeSignedRequest('POST', '/fapi/v1/order', params);
-            this.logger.log(`🎯 Take profit order placed: ${quantity} ${symbol} at ${stopPrice} - OrderId: ${order.orderId}`);
-            return order;
-        }
-        catch (error) {
-            this.logger.error(`❌ Failed to place take profit order: ${symbol} at ${stopPrice}`, error);
-            throw error;
-        }
-    }
-    async cancelOrder(symbol, orderId) {
-        try {
-            const params = {
-                symbol,
-                orderId,
-            };
-            const result = await this.makeSignedRequest('DELETE', '/fapi/v1/order', params);
-            this.logger.log(`❌ Order cancelled: ${symbol} OrderId: ${orderId}`);
-            return result;
-        }
-        catch (error) {
-            this.logger.error(`❌ Failed to cancel order: ${symbol} OrderId: ${orderId}`, error);
-            throw error;
-        }
-    }
     async cleanup() {
         if (this.keepAliveInterval) {
             clearInterval(this.keepAliveInterval);
@@ -249,6 +356,7 @@ let BinanceService = BinanceService_1 = class BinanceService {
         if (this.userDataStream) {
             this.userDataStream.close();
         }
+        this.removeSymbolsFromWatch(Object.keys(this.symbolStreams));
         if (this.listenKey) {
             try {
                 await this.makeSignedRequest('DELETE', '/fapi/v1/listenKey');

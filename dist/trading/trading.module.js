@@ -11,6 +11,7 @@ const common_1 = require("@nestjs/common");
 const trading_controller_1 = require("./trading.controller");
 const trading_service_1 = require("./trading.service");
 const binance_module_1 = require("../binance/binance.module");
+const storage_service_1 = require("../storage/storage.service");
 let TradingModule = class TradingModule {
 };
 exports.TradingModule = TradingModule;
@@ -18,7 +19,7 @@ exports.TradingModule = TradingModule = __decorate([
     (0, common_1.Module)({
         imports: [binance_module_1.BinanceModule],
         controllers: [trading_controller_1.TradingController],
-        providers: [trading_service_1.TradingService],
+        providers: [trading_service_1.TradingService, storage_service_1.StorageService],
     })
 ], TradingModule);
 //# sourceMappingURL=trading.module.js.map
