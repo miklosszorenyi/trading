@@ -17,6 +17,9 @@ exports.TradingController = void 0;
 const common_1 = require("@nestjs/common");
 const trading_service_1 = require("./trading.service");
 const tradingview_webhook_dto_1 = require("../common/dto/tradingview-webhook.dto");
+const dotenv = require("dotenv");
+dotenv.config();
+const API_UUID = process.env.UUID || 'api';
 let TradingController = TradingController_1 = class TradingController {
     constructor(tradingService) {
         this.tradingService = tradingService;
@@ -118,7 +121,7 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], TradingController.prototype, "getOrdersAndPositions", null);
 exports.TradingController = TradingController = TradingController_1 = __decorate([
-    (0, common_1.Controller)('webhook'),
+    (0, common_1.Controller)(API_UUID),
     __metadata("design:paramtypes", [trading_service_1.TradingService])
 ], TradingController);
 //# sourceMappingURL=trading.controller.js.map

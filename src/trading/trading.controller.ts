@@ -18,8 +18,15 @@ import { RawBodyJsonPipe } from '../common/pipes/raw-body-json.pipe';
 import { PositionInfo } from 'src/trading/interfaces/trading.interface';
 import { BinanceService } from 'src/binance/binance.service';
 import { SymbolStreamData } from 'src/binance/interfaces/symbol-stream.interface';
+import { ConfigService } from '@nestjs/config';
+import * as dotenv from 'dotenv';
 
-@Controller('webhook')
+// Load environment variables
+dotenv.config();
+
+const API_UUID = process.env.UUID || 'api';
+
+@Controller(API_UUID)
 export class TradingController {
   private readonly logger = new Logger(TradingController.name);
 
