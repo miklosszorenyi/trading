@@ -16,18 +16,24 @@ class TradingViewWebhookDto {
 }
 exports.TradingViewWebhookDto = TradingViewWebhookDto;
 __decorate([
+    (0, class_transformer_1.Transform)(({ value }) => {
+        return parseFloat(value);
+    }),
     (0, class_validator_1.IsNumber)(),
     __metadata("design:type", Number)
 ], TradingViewWebhookDto.prototype, "low", void 0);
 __decorate([
+    (0, class_transformer_1.Transform)(({ value }) => {
+        return parseFloat(value);
+    }),
     (0, class_validator_1.IsNumber)(),
     __metadata("design:type", Number)
 ], TradingViewWebhookDto.prototype, "high", void 0);
 __decorate([
     (0, class_transformer_1.Transform)(({ value }) => {
-        if (value === 0)
+        if (value === '0')
             return 'SELL';
-        if (value === 1)
+        if (value === '1')
             return 'BUY';
         return value;
     }),

@@ -270,6 +270,14 @@
       "low": 3786.81,
       "high": 3836.75,
       "requestTime": "2025-07-31T13:45:42.312Z"
+    },
+    {
+      "orderId": 4940032036,
+      "symbol": "ETHUSDT",
+      "type": "SELL",
+      "low": 3545.91,
+      "high": 3551.7,
+      "requestTime": "2025-08-01T21:49:36.754Z"
     }
   ]
 }

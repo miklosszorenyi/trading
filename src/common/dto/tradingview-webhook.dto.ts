@@ -2,17 +2,21 @@ import { IsString, IsNumber, IsIn, IsOptional } from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class TradingViewWebhookDto {
+  @Transform(({ value }) => {
+    return parseFloat(value);
+  })
   @IsNumber()
   low: number;
 
+  @Transform(({ value }) => {
+    return parseFloat(value);
+  })
   @IsNumber()
   high: number;
 
   @Transform(({ value }) => {
-    // Ha a value 0 vagy 1 szám, akkor konvertáljuk string-re
-    if (value === 0) return 'SELL';
-    if (value === 1) return 'BUY';
-    // Ha már string, akkor hagyjuk
+    if (value === '0') return 'SELL';
+    if (value === '1') return 'BUY';
     return value;
   })
   @IsString()
