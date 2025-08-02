@@ -1,10 +1,12 @@
 import { TradingService } from './trading.service';
 import { TradingViewWebhookDto } from '../common/dto/tradingview-webhook.dto';
+import { BinanceService } from 'src/binance/binance.service';
 import { SymbolStreamData } from 'src/binance/interfaces/symbol-stream.interface';
 export declare class TradingController {
     private readonly tradingService;
+    private readonly binanceService;
     private readonly logger;
-    constructor(tradingService: TradingService);
+    constructor(tradingService: TradingService, binanceService: BinanceService);
     handleTradingViewWebhook(webhookData: TradingViewWebhookDto): Promise<{
         success: boolean;
         message: string;
@@ -27,6 +29,7 @@ export declare class TradingController {
     getOrdersAndPositions(): Promise<{
         success: boolean;
         data: {
+            balance: any;
             openOrders: {
                 count: number;
                 orders: import("src/trading/interfaces/trading.interface").Order[];

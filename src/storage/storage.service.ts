@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { readFile } from 'fs';
+import { existsSync, readFile, writeFileSync } from 'fs';
 
 export class StorageService {
   private readonly logger = new Logger(StorageService.name);
@@ -20,6 +20,8 @@ export class StorageService {
   }
 
   private async readJsonFile(filePath: string): Promise<any> {
+    this.createFileIfNotExists(filePath);
+
     return new Promise((resolve, reject) => {
       readFile(filePath, 'utf8', (err, data) => {
         if (err) {
@@ -44,5 +46,12 @@ export class StorageService {
     const jsonData = JSON.stringify(data, null, 2);
     require('fs').writeFileSync(filePath, jsonData, 'utf8');
     this.logger.log(`Successfully wrote JSON to ${filePath}`);
+  }
+
+  private createFileIfNotExists(filePath: string): void {
+    if (!existsSync(filePath)) {
+      writeFileSync(filePath, JSON.stringify({}), 'utf8');
+      this.logger.log(`Created file ${filePath} as it did not exist`);
+    }
   }
 }

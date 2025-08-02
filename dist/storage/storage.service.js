@@ -18,6 +18,7 @@ class StorageService {
         return data[dataKey] || null;
     }
     async readJsonFile(filePath) {
+        this.createFileIfNotExists(filePath);
         return new Promise((resolve, reject) => {
             (0, fs_1.readFile)(filePath, 'utf8', (err, data) => {
                 if (err) {
@@ -40,6 +41,12 @@ class StorageService {
         const jsonData = JSON.stringify(data, null, 2);
         require('fs').writeFileSync(filePath, jsonData, 'utf8');
         this.logger.log(`Successfully wrote JSON to ${filePath}`);
+    }
+    createFileIfNotExists(filePath) {
+        if (!(0, fs_1.existsSync)(filePath)) {
+            (0, fs_1.writeFileSync)(filePath, JSON.stringify({}), 'utf8');
+            this.logger.log(`Created file ${filePath} as it did not exist`);
+        }
     }
 }
 exports.StorageService = StorageService;

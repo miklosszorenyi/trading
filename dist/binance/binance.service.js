@@ -26,10 +26,10 @@ let BinanceService = BinanceService_1 = class BinanceService {
         this.orderUpdateCallback = null;
         this.priceInfoCallback = null;
         this.symbolStreams = {};
-        this.baseURL = 'https://testnet.binancefuture.com';
-        this.wsBaseURL = 'wss://stream.binancefuture.com';
         this.apiKey = this.configService.get('BINANCE_API_KEY');
         this.apiSecret = this.configService.get('BINANCE_API_SECRET');
+        this.baseURL = this.configService.get('BINANCE_API_BASE_URL');
+        this.wsBaseURL = this.configService.get('BINANCE_WS_BASE_URL');
         if (!this.apiKey || !this.apiSecret) {
             throw new Error('Binance API credentials not found in environment variables');
         }
@@ -53,10 +53,12 @@ let BinanceService = BinanceService_1 = class BinanceService {
     setPriceInfoCallback(callback) {
         this.priceInfoCallback = callback;
     }
-    async getAccountBalance() {
+    async getAccountBalance(asset) {
         try {
             const accountInfo = await this.makeSignedRequest('GET', '/fapi/v2/account');
-            return accountInfo.assets;
+            return asset
+                ? accountInfo.assets.find((b) => b.asset === asset)
+                : accountInfo.assets;
         }
         catch (error) {
             this.logger.error('❌ Failed to get account balance', error);

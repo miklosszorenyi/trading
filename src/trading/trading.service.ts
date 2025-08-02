@@ -227,8 +227,7 @@ export class TradingService implements OnModuleInit {
   ): Promise<number | null> {
     // Get account balance
     const balances = await this.binanceService.getAccountBalance();
-    const usdtBalance =
-      balances.find((b) => b.asset === 'USDT')?.walletBalance || '0';
+    const usdtBalance = balances?.walletBalance || '0';
 
     if (!usdtBalance) {
       this.logger.error('❌ Insufficient USDT balance');

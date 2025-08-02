@@ -5,4 +5,5 @@ export declare class StorageService {
     getData(dataKey: string): Promise<Object | null>;
     private readJsonFile;
     private writeJsonFile;
+    private createFileIfNotExists;
 }

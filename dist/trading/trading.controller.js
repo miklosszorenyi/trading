@@ -17,12 +17,14 @@ exports.TradingController = void 0;
 const common_1 = require("@nestjs/common");
 const trading_service_1 = require("./trading.service");
 const tradingview_webhook_dto_1 = require("../common/dto/tradingview-webhook.dto");
+const binance_service_1 = require("../binance/binance.service");
 const dotenv = require("dotenv");
 dotenv.config();
 const API_UUID = process.env.UUID || 'api';
 let TradingController = TradingController_1 = class TradingController {
-    constructor(tradingService) {
+    constructor(tradingService, binanceService) {
         this.tradingService = tradingService;
+        this.binanceService = binanceService;
         this.logger = new common_1.Logger(TradingController_1.name);
     }
     async handleTradingViewWebhook(webhookData) {
@@ -70,6 +72,7 @@ let TradingController = TradingController_1 = class TradingController {
             return {
                 success: true,
                 data: {
+                    balance: await this.binanceService.getAccountBalance(),
                     openOrders: {
                         count: data.openOrders.length,
                         orders: data.openOrders,
@@ -122,6 +125,7 @@ __decorate([
 ], TradingController.prototype, "getOrdersAndPositions", null);
 exports.TradingController = TradingController = TradingController_1 = __decorate([
     (0, common_1.Controller)(API_UUID),
-    __metadata("design:paramtypes", [trading_service_1.TradingService])
+    __metadata("design:paramtypes", [trading_service_1.TradingService,
+        binance_service_1.BinanceService])
 ], TradingController);
 //# sourceMappingURL=trading.controller.js.map

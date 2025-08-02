@@ -134,7 +134,7 @@ let TradingService = TradingService_1 = class TradingService {
     }
     async calculatePositionSize(symbol, symbolInfo, signal) {
         const balances = await this.binanceService.getAccountBalance();
-        const usdtBalance = balances.find((b) => b.asset === 'USDT')?.walletBalance || '0';
+        const usdtBalance = balances?.walletBalance || '0';
         if (!usdtBalance) {
             this.logger.error('❌ Insufficient USDT balance');
             return null;

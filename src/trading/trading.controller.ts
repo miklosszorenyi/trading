@@ -30,7 +30,10 @@ const API_UUID = process.env.UUID || 'api';
 export class TradingController {
   private readonly logger = new Logger(TradingController.name);
 
-  constructor(private readonly tradingService: TradingService) {}
+  constructor(
+    private readonly tradingService: TradingService,
+    private readonly binanceService: BinanceService,
+  ) {}
 
   @Post('tradingview')
   // @UsePipes(new RawBodyJsonPipe())
@@ -99,6 +102,7 @@ export class TradingController {
       return {
         success: true,
         data: {
+          balance: await this.binanceService.getAccountBalance(),
           // Binance API-ból lekért nyitott megbízások
           openOrders: {
             count: data.openOrders.length,

@@ -70,13 +70,15 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
     this.priceInfoCallback = callback;
   }
 
-  async getAccountBalance(): Promise<any> {
+  async getAccountBalance(asset?: string): Promise<any> {
     try {
       const accountInfo = await this.makeSignedRequest(
         'GET',
         '/fapi/v2/account',
       );
-      return accountInfo.assets;
+      return asset
+        ? accountInfo.assets.find((b) => b.asset === asset)
+        : accountInfo.assets;
     } catch (error) {
       this.logger.error('❌ Failed to get account balance', error);
       throw error;
