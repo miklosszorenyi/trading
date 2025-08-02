@@ -21,6 +21,7 @@ const binance_service_1 = require("../binance/binance.service");
 const dotenv = require("dotenv");
 dotenv.config();
 const API_UUID = process.env.UUID || 'api';
+const BINANCE_TRADING_ASSET = process.env.BINANCE_TRADING_ASSET || 'USDT';
 let TradingController = TradingController_1 = class TradingController {
     constructor(tradingService, binanceService) {
         this.tradingService = tradingService;
@@ -72,7 +73,7 @@ let TradingController = TradingController_1 = class TradingController {
             return {
                 success: true,
                 data: {
-                    balance: await this.binanceService.getAccountBalance(),
+                    balance: await this.binanceService.getAccountBalance(BINANCE_TRADING_ASSET),
                     openOrders: {
                         count: data.openOrders.length,
                         orders: data.openOrders,

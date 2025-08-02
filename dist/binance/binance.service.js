@@ -54,6 +54,7 @@ let BinanceService = BinanceService_1 = class BinanceService {
         this.priceInfoCallback = callback;
     }
     async getAccountBalance(asset) {
+        this.logger.log(`Fetching account balance for asset: ${asset || 'all'}`);
         try {
             const accountInfo = await this.makeSignedRequest('GET', '/fapi/v2/account');
             return asset

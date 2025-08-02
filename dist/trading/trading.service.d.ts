@@ -12,6 +12,7 @@ export declare class TradingService implements OnModuleInit {
     private readonly logger;
     private readonly maxPositionPercentage;
     private readonly maxLeverage;
+    private readonly binanceTradingAsset;
     private positionInfo;
     constructor(binanceService: BinanceService, configService: ConfigService, storageService: StorageService);
     onModuleInit(): Promise<void>;

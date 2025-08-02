@@ -71,6 +71,8 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
   }
 
   async getAccountBalance(asset?: string): Promise<any> {
+    this.logger.log(`Fetching account balance for asset: ${asset || 'all'}`);
+
     try {
       const accountInfo = await this.makeSignedRequest(
         'GET',

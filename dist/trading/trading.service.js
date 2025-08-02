@@ -25,6 +25,7 @@ let TradingService = TradingService_1 = class TradingService {
         this.logger = new common_1.Logger(TradingService_1.name);
         this.maxPositionPercentage = this.configService.get('MAX_POSITION_PERCENTAGE', 2);
         this.maxLeverage = this.configService.get('MAX_LEVERAGE', 20);
+        this.binanceTradingAsset = this.configService.get('BINANCE_TRADING_ASSET', 'USDT');
     }
     async onModuleInit() {
         this.binanceService.setOrderUpdateCallback((data) => {
@@ -133,22 +134,22 @@ let TradingService = TradingService_1 = class TradingService {
         await this.storageService.setData('requestedOrders', updatedOrders);
     }
     async calculatePositionSize(symbol, symbolInfo, signal) {
-        const balances = await this.binanceService.getAccountBalance();
-        const usdtBalance = balances?.walletBalance || '0';
-        if (!usdtBalance) {
-            this.logger.error('❌ Insufficient USDT balance');
+        const balances = await this.binanceService.getAccountBalance(this.binanceTradingAsset);
+        const tradingBalance = balances?.walletBalance || '0';
+        if (!tradingBalance) {
+            this.logger.error('❌ Insufficient balance');
             return null;
         }
         const stepSize = (0, filter_utils_1.getQuantityStepSize)(symbolInfo);
         const minQty = (0, filter_utils_1.getMinQuantity)(symbolInfo);
         const maxQty = (0, filter_utils_1.getMaxQuantity)(symbolInfo);
-        const quantity = (0, precision_1.roundToPrecision)((usdtBalance * (this.maxPositionPercentage / 100)) /
+        const quantity = (0, precision_1.roundToPrecision)((tradingBalance * (this.maxPositionPercentage / 100)) /
             (signal.high - signal.low), stepSize);
         if (!(0, precision_1.validateRange)(quantity, minQty, maxQty)) {
             this.logger.error(`❌ Calculated quantity ${quantity} is outside allowed range [${minQty}, ${maxQty}]`);
             return null;
         }
-        const requiredLeverage = Math.ceil((quantity * signal.high) / parseFloat(usdtBalance));
+        const requiredLeverage = Math.ceil((quantity * signal.high) / parseFloat(tradingBalance));
         if (requiredLeverage > this.maxLeverage) {
             this.logger.error(`❌ Required leverage ${requiredLeverage} exceeds max allowed ${this.maxLeverage}`);
             return null;
