@@ -24,6 +24,8 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
   private httpClient: AxiosInstance;
   private apiKey: string;
   private apiSecret: string;
+  private baseURL: string;
+  private wsBaseURL: string;
   private userDataStream: WebSocket | null = null;
   private listenKey: string | null = null;
   private keepAliveInterval: NodeJS.Timeout | null = null;
@@ -31,12 +33,11 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
   private priceInfoCallback: ((data: any) => void) | null = null;
   private symbolStreams: SymbolStreamMap = {};
 
-  private readonly baseURL = 'https://testnet.binancefuture.com';
-  private readonly wsBaseURL = 'wss://stream.binancefuture.com';
-
   constructor(private configService: ConfigService) {
     this.apiKey = this.configService.get<string>('BINANCE_API_KEY');
     this.apiSecret = this.configService.get<string>('BINANCE_API_SECRET');
+    this.baseURL = this.configService.get<string>('BINANCE_API_BASE_URL');
+    this.wsBaseURL = this.configService.get<string>('BINANCE_WS_BASE_URL');
 
     if (!this.apiKey || !this.apiSecret) {
       throw new Error(

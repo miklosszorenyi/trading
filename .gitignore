@@ -1,3 +1,4 @@
 node_modules/
 .env
 tsconfig.build.tsbuildinfo
+data.json
