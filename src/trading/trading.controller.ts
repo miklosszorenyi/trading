@@ -25,6 +25,7 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 const API_UUID = process.env.UUID || 'api';
+const BINANCE_TRADING_ASSET = process.env.BINANCE_TRADING_ASSET || 'USDT';
 
 @Controller(API_UUID)
 export class TradingController {
@@ -102,7 +103,9 @@ export class TradingController {
       return {
         success: true,
         data: {
-          balance: await this.binanceService.getAccountBalance(),
+          balance: await this.binanceService.getAccountBalance(
+            BINANCE_TRADING_ASSET,
+          ),
           // Binance API-ból lekért nyitott megbízások
           openOrders: {
             count: data.openOrders.length,

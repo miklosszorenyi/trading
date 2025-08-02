@@ -29,6 +29,7 @@ export class TradingService implements OnModuleInit {
   private readonly logger = new Logger(TradingService.name);
   private readonly maxPositionPercentage: number;
   private readonly maxLeverage: number;
+  private readonly binanceTradingAsset: string;
   private positionInfo: PositionInfo;
 
   constructor(
@@ -41,6 +42,10 @@ export class TradingService implements OnModuleInit {
       2,
     );
     this.maxLeverage = this.configService.get<number>('MAX_LEVERAGE', 20);
+    this.binanceTradingAsset = this.configService.get<string>(
+      'BINANCE_TRADING_ASSET',
+      'USDT',
+    );
   }
 
   async onModuleInit() {
@@ -226,11 +231,13 @@ export class TradingService implements OnModuleInit {
     signal?: TradingViewWebhookDto,
   ): Promise<number | null> {
     // Get account balance
-    const balances = await this.binanceService.getAccountBalance();
-    const usdtBalance = balances?.walletBalance || '0';
+    const balances = await this.binanceService.getAccountBalance(
+      this.binanceTradingAsset,
+    );
+    const tradingBalance = balances?.walletBalance || '0';
 
-    if (!usdtBalance) {
-      this.logger.error('❌ Insufficient USDT balance');
+    if (!tradingBalance) {
+      this.logger.error('❌ Insufficient balance');
       return null;
     }
 
@@ -241,7 +248,7 @@ export class TradingService implements OnModuleInit {
 
     // Round to step size with proper precision
     const quantity = roundToPrecision(
-      (usdtBalance * (this.maxPositionPercentage / 100)) /
+      (tradingBalance * (this.maxPositionPercentage / 100)) /
         (signal.high - signal.low),
       stepSize,
     );
@@ -255,7 +262,7 @@ export class TradingService implements OnModuleInit {
     }
 
     const requiredLeverage = Math.ceil(
-      (quantity * signal.high) / parseFloat(usdtBalance),
+      (quantity * signal.high) / parseFloat(tradingBalance),
     );
 
     if (requiredLeverage > this.maxLeverage) {
