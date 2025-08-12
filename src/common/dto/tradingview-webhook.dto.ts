@@ -24,6 +24,9 @@ export class TradingViewWebhookDto {
   @IsOptional()
   type?: 'BUY' | 'SELL';
 
+  @Transform(({ value }) => {
+    return value.split('.')[0]; // because of perpetual symbols: BTCUSDT.P
+  })
   @IsString()
   symbol: string;
 }
