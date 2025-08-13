@@ -14,6 +14,7 @@ import {
 } from './interfaces/symbol-stream.interface';
 import {
   OrderDTO,
+  OrderType,
   PositionDTO,
 } from 'src/trading/interfaces/trading.interface';
 import { PlaceOrderParams } from './interfaces/place-order-params.interface';
@@ -161,17 +162,18 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async placeMarketOrder(
+  async placeOrder(
     symbol: string,
     side: 'BUY' | 'SELL',
     quantity: number,
     stopPrice: number,
+    type: OrderType,
   ): Promise<OrderDTO> {
     try {
       const params: PlaceOrderParams = {
         symbol,
         side,
-        type: 'STOP_MARKET',
+        type,
         quantity,
         stopPrice,
       };
@@ -194,6 +196,36 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  async placeMarketOrder(
+    symbol: string,
+    side: 'BUY' | 'SELL',
+    quantity: number,
+    stopPrice: number,
+  ): Promise<OrderDTO> {
+    return this.placeOrder(
+      symbol,
+      side,
+      quantity,
+      stopPrice,
+      OrderType.STOP_MARKET
+    )
+  }
+
+  async placeLimitOrder(
+    symbol: string,
+    side: 'BUY' | 'SELL',
+    quantity: number,
+    stopPrice: number,
+  ): Promise<OrderDTO> {
+    return this.placeOrder(
+      symbol,
+      side,
+      quantity,
+      stopPrice,
+      OrderType.LIMIT
+    )
+  }
+
   async placeStopLossOrder(
     symbol: string,
     side: 'BUY' | 'SELL',
@@ -204,7 +236,7 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
       const params: PlaceOrderParams = {
         symbol,
         side: side === 'BUY' ? 'SELL' : 'BUY', // +
-        type: 'STOP_MARKET',
+        type: OrderType.STOP_MARKET,
         stopPrice,
         closePosition: true,
       };
@@ -237,7 +269,7 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
       const params: PlaceOrderParams = {
         symbol,
         side: side === 'BUY' ? 'SELL' : 'BUY',
-        type: 'TAKE_PROFIT_MARKET',
+        type: OrderType.TAKE_PROFIT_MARKET,
         stopPrice,
         closePosition: true,
       };

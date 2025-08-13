@@ -1,7 +1,7 @@
 import { OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SymbolStreamData } from './interfaces/symbol-stream.interface';
-import { OrderDTO } from 'src/trading/interfaces/trading.interface';
+import { OrderDTO, OrderType } from 'src/trading/interfaces/trading.interface';
 export declare class BinanceService implements OnModuleInit, OnModuleDestroy {
     private configService;
     private readonly logger;
@@ -26,7 +26,9 @@ export declare class BinanceService implements OnModuleInit, OnModuleDestroy {
     getPositions(): Promise<any>;
     getSymbolPrice(symbol: string): Promise<number>;
     getSymbolInfo(symbol: string): Promise<any>;
+    placeOrder(symbol: string, side: 'BUY' | 'SELL', quantity: number, stopPrice: number, type: OrderType): Promise<OrderDTO>;
     placeMarketOrder(symbol: string, side: 'BUY' | 'SELL', quantity: number, stopPrice: number): Promise<OrderDTO>;
+    placeLimitOrder(symbol: string, side: 'BUY' | 'SELL', quantity: number, stopPrice: number): Promise<OrderDTO>;
     placeStopLossOrder(symbol: string, side: 'BUY' | 'SELL', quantity: number, stopPrice: number): Promise<OrderDTO>;
     placeTakeProfitOrder(symbol: string, side: 'BUY' | 'SELL', quantity: number, stopPrice: number): Promise<OrderDTO>;
     cancelOrder(symbol: string, orderId: number): Promise<any>;

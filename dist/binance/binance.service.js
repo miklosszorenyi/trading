@@ -16,6 +16,7 @@ const config_1 = require("@nestjs/config");
 const axios_1 = require("axios");
 const crypto = require("crypto");
 const WebSocket = require("ws");
+const trading_interface_1 = require("../trading/interfaces/trading.interface");
 let BinanceService = BinanceService_1 = class BinanceService {
     constructor(configService) {
         this.configService = configService;
@@ -130,12 +131,12 @@ let BinanceService = BinanceService_1 = class BinanceService {
             throw error;
         }
     }
-    async placeMarketOrder(symbol, side, quantity, stopPrice) {
+    async placeOrder(symbol, side, quantity, stopPrice, type) {
         try {
             const params = {
                 symbol,
                 side,
-                type: 'STOP_MARKET',
+                type,
                 quantity,
                 stopPrice,
             };
@@ -148,12 +149,18 @@ let BinanceService = BinanceService_1 = class BinanceService {
             throw error;
         }
     }
+    async placeMarketOrder(symbol, side, quantity, stopPrice) {
+        return this.placeOrder(symbol, side, quantity, stopPrice, trading_interface_1.OrderType.STOP_MARKET);
+    }
+    async placeLimitOrder(symbol, side, quantity, stopPrice) {
+        return this.placeOrder(symbol, side, quantity, stopPrice, trading_interface_1.OrderType.LIMIT);
+    }
     async placeStopLossOrder(symbol, side, quantity, stopPrice) {
         try {
             const params = {
                 symbol,
                 side: side === 'BUY' ? 'SELL' : 'BUY',
-                type: 'STOP_MARKET',
+                type: trading_interface_1.OrderType.STOP_MARKET,
                 stopPrice,
                 closePosition: true,
             };
@@ -171,7 +178,7 @@ let BinanceService = BinanceService_1 = class BinanceService {
             const params = {
                 symbol,
                 side: side === 'BUY' ? 'SELL' : 'BUY',
-                type: 'TAKE_PROFIT_MARKET',
+                type: trading_interface_1.OrderType.TAKE_PROFIT_MARKET,
                 stopPrice,
                 closePosition: true,
             };

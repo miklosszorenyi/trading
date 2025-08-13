@@ -43,6 +43,9 @@ __decorate([
     __metadata("design:type", String)
 ], TradingViewWebhookDto.prototype, "type", void 0);
 __decorate([
+    (0, class_transformer_1.Transform)(({ value }) => {
+        return value.split('.')[0];
+    }),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], TradingViewWebhookDto.prototype, "symbol", void 0);
