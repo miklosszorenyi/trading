@@ -4,6 +4,7 @@ import { BinanceService } from '../binance/binance.service';
 import {
   Order,
   OrderDTO,
+  OrderSide,
   OrderType,
   PositionInfo,
   RequestedOrder,
@@ -100,7 +101,7 @@ export class TradingService implements OnModuleInit {
       // Calculate stop price based on signal direction with proper precision
       const priceTickSize = getPriceTickSize(symbolInfo);
       const stopPrice: number = roundToPrecision(
-        signal.type === 'BUY' ? signal.high : signal.low,
+        signal.type === OrderSide.BUY ? signal.high : signal.low,
         priceTickSize,
       );
 
@@ -119,7 +120,7 @@ export class TradingService implements OnModuleInit {
         signal.symbol,
         signal.type,
         formatToPrecision(quantity, getQuantityStepSize(symbolInfo)),
-        formatToPrecision(stopPrice, priceTickSize),
+        // formatToPrecision(stopPrice, priceTickSize),
       );
 
       // position.orderId = order.orderId;
@@ -312,14 +313,15 @@ export class TradingService implements OnModuleInit {
         this.positionInfo.requestedOrders.find((o) => o.orderId === orderId);
 
       if (relatedOrder) {
-        let exitPrice = side === 'BUY' ? relatedOrder.low : relatedOrder.high;
+        let exitPrice =
+          side === OrderSide.BUY ? relatedOrder.low : relatedOrder.high;
         const { price } = data;
 
         if (symbol === data.symbol) {
           if (
             !closePosition &&
-            ((side === 'BUY' && price < exitPrice) ||
-              (side === 'SELL' && price > exitPrice))
+            ((side === OrderSide.BUY && price < exitPrice) ||
+              (side === OrderSide.SELL && price > exitPrice))
           ) {
             this.logger.log(
               `🛑 Cancelling order ${orderId} for ${symbol} because price moved against position`,
@@ -344,13 +346,13 @@ export class TradingService implements OnModuleInit {
     // place TP order
     const order = await this.getRequestedOrder(orderId);
     const takeProfitPrice = roundToPrecision(
-      order.type === 'BUY'
+      order.type === OrderSide.BUY
         ? order.high + (order.high - order.low) * 2
         : order.low - (order.high - order.low) * 2,
       priceTickSize,
     );
     const stopLossPrice = roundToPrecision(
-      order.type === 'BUY' ? order.low : order.high,
+      order.type === OrderSide.BUY ? order.low : order.high,
       priceTickSize,
     );
 

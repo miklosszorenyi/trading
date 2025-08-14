@@ -1,5 +1,6 @@
 import { IsString, IsNumber, IsIn, IsOptional } from 'class-validator';
 import { Transform } from 'class-transformer';
+import { OrderSide } from 'src/trading/interfaces/trading.interface';
 
 export class TradingViewWebhookDto {
   @Transform(({ value }) => {
@@ -15,14 +16,14 @@ export class TradingViewWebhookDto {
   high: number;
 
   @Transform(({ value }) => {
-    if (value === '0') return 'SELL';
-    if (value === '1') return 'BUY';
+    if (value === '0') return OrderSide.SELL;
+    if (value === '1') return OrderSide.BUY;
     return value;
   })
   @IsString()
-  @IsIn(['BUY', 'SELL'])
+  @IsIn([OrderSide.BUY, OrderSide.SELL])
   @IsOptional()
-  type?: 'BUY' | 'SELL';
+  type?: OrderSide;
 
   @Transform(({ value }) => {
     return value.split('.')[0]; // because of perpetual symbols: BTCUSDT.P

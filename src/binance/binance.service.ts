@@ -14,10 +14,14 @@ import {
 } from './interfaces/symbol-stream.interface';
 import {
   OrderDTO,
+  OrderSide,
   OrderType,
   PositionDTO,
 } from 'src/trading/interfaces/trading.interface';
-import { PlaceOrderParams } from './interfaces/place-order-params.interface';
+import {
+  PlaceOrderParams,
+  PlaceOrderParamsDTO,
+} from './interfaces/place-order-params.interface';
 
 @Injectable()
 export class BinanceService implements OnModuleInit, OnModuleDestroy {
@@ -162,22 +166,10 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async placeOrder(
-    symbol: string,
-    side: 'BUY' | 'SELL',
-    quantity: number,
-    stopPrice: number,
-    type: OrderType,
-  ): Promise<OrderDTO> {
-    try {
-      const params: PlaceOrderParams = {
-        symbol,
-        side,
-        type,
-        quantity,
-        stopPrice,
-      };
+  async placeOrder(params: PlaceOrderParams): Promise<OrderDTO> {
+    const { symbol, side, quantity, stopPrice } = params;
 
+    try {
       const order = await this.makeSignedRequest(
         'POST',
         '/fapi/v1/order',
@@ -198,39 +190,38 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
 
   async placeMarketOrder(
     symbol: string,
-    side: 'BUY' | 'SELL',
+    side: OrderSide,
     quantity: number,
     stopPrice: number,
   ): Promise<OrderDTO> {
-    return this.placeOrder(
+    return this.placeOrder({
       symbol,
       side,
       quantity,
       stopPrice,
-      OrderType.STOP_MARKET,
-    );
+      type: OrderType.STOP_MARKET,
+    });
   }
 
   async placeLimitOrder(
     symbol: string,
-    side: 'BUY' | 'SELL',
+    side: OrderSide,
     quantity: number,
-    stopPrice: number,
   ): Promise<OrderDTO> {
-    return this.placeOrder(symbol, side, quantity, stopPrice, OrderType.LIMIT);
+    return this.placeOrder({ symbol, side, quantity, type: OrderType.LIMIT });
   }
 
   async placeStopLossOrder(
     symbol: string,
-    side: 'BUY' | 'SELL',
+    side: OrderSide,
     quantity: number,
     stopPrice: number,
     type: OrderType = OrderType.STOP_MARKET,
   ): Promise<OrderDTO> {
     try {
-      const params: PlaceOrderParams = {
+      const params: PlaceOrderParamsDTO = {
         symbol,
-        side: side === 'BUY' ? 'SELL' : 'BUY', // +
+        side: side === OrderSide.BUY ? OrderSide.SELL : OrderSide.BUY,
         type,
         stopPrice,
         closePosition: true,
@@ -256,15 +247,15 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
 
   async placeTakeProfitOrder(
     symbol: string,
-    side: 'BUY' | 'SELL',
+    side: OrderSide,
     quantity: number,
     stopPrice: number,
     type: OrderType = OrderType.TAKE_PROFIT_MARKET,
   ): Promise<OrderDTO> {
     try {
-      const params: PlaceOrderParams = {
+      const params: PlaceOrderParamsDTO = {
         symbol,
-        side: side === 'BUY' ? 'SELL' : 'BUY',
+        side: side === OrderSide.BUY ? OrderSide.SELL : OrderSide.BUY,
         type,
         stopPrice,
         closePosition: true,

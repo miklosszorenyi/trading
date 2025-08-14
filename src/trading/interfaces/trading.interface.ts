@@ -95,7 +95,7 @@ export interface Order {
 export interface RequestedOrder {
   orderId?: number;
   symbol: string;
-  type: 'BUY' | 'SELL';
+  type: OrderSide;
   low: number;
   high: number;
   requestTime: Date;
@@ -115,4 +115,9 @@ export enum OrderType {
   // maker
   LIMIT = 'LIMIT',
   TAKE_PROFIT_LIMIT = 'TAKE_PROFIT_LIMIT',
+}
+
+export enum OrderSide {
+  BUY = 'BUY',
+  SELL = 'SELL',
 }

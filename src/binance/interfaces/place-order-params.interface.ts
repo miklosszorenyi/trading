@@ -1,11 +1,14 @@
-import { OrderType } from 'src/trading/interfaces/trading.interface';
+import { OrderSide, OrderType } from 'src/trading/interfaces/trading.interface';
 
 export interface PlaceOrderParams {
   symbol: string;
-  side: string;
+  side: OrderSide;
   type: OrderType;
-  stopPrice: number;
-  closePosition?: boolean;
   quantity?: number;
+  stopPrice?: number;
+}
+
+export interface PlaceOrderParamsDTO extends PlaceOrderParams {
+  closePosition?: boolean;
   workingType?: string;
 }
