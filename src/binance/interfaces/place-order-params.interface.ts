@@ -6,6 +6,7 @@ export interface PlaceOrderParams {
   type: OrderType;
   quantity?: number;
   stopPrice?: number;
+  timeInForce?: string;
 }
 
 export interface PlaceOrderParamsDTO extends PlaceOrderParams {

@@ -208,7 +208,13 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
     side: OrderSide,
     quantity: number,
   ): Promise<OrderDTO> {
-    return this.placeOrder({ symbol, side, quantity, type: OrderType.LIMIT });
+    return this.placeOrder({
+      symbol,
+      side,
+      quantity,
+      type: OrderType.LIMIT,
+      timeInForce: 'GTC',
+    });
   }
 
   async placeStopLossOrder(
