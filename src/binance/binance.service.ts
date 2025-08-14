@@ -207,6 +207,7 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
     symbol: string,
     side: OrderSide,
     quantity: number,
+    stopPrice: number,
   ): Promise<OrderDTO> {
     return this.placeOrder({
       symbol,
@@ -214,6 +215,7 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
       quantity,
       type: OrderType.LIMIT,
       timeInForce: 'GTC',
+      price: stopPrice,
     });
   }
 

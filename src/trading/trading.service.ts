@@ -120,7 +120,7 @@ export class TradingService implements OnModuleInit {
         signal.symbol,
         signal.type,
         formatToPrecision(quantity, getQuantityStepSize(symbolInfo)),
-        // formatToPrecision(stopPrice, priceTickSize),
+        formatToPrecision(stopPrice, priceTickSize),
       );
 
       // position.orderId = order.orderId;
