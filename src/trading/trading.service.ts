@@ -116,7 +116,7 @@ export class TradingService implements OnModuleInit {
       }
 
       // Place stop market order with properly formatted values
-      const order = await this.binanceService.placeLimitOrder(
+      const order = await this.binanceService.placeMarketOrder(
         signal.symbol,
         signal.type,
         formatToPrecision(quantity, getQuantityStepSize(symbolInfo)),
@@ -361,7 +361,6 @@ export class TradingService implements OnModuleInit {
       order.type,
       filledQuantity,
       takeProfitPrice,
-      OrderType.TAKE_PROFIT_LIMIT,
     );
 
     // place SL order
@@ -370,7 +369,6 @@ export class TradingService implements OnModuleInit {
       order.type,
       filledQuantity,
       stopLossPrice,
-      OrderType.LIMIT,
     );
   }
 
