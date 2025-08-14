@@ -207,8 +207,8 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
       side,
       quantity,
       stopPrice,
-      OrderType.STOP_MARKET
-    )
+      OrderType.STOP_MARKET,
+    );
   }
 
   async placeLimitOrder(
@@ -217,13 +217,7 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
     quantity: number,
     stopPrice: number,
   ): Promise<OrderDTO> {
-    return this.placeOrder(
-      symbol,
-      side,
-      quantity,
-      stopPrice,
-      OrderType.LIMIT
-    )
+    return this.placeOrder(symbol, side, quantity, stopPrice, OrderType.LIMIT);
   }
 
   async placeStopLossOrder(
@@ -231,12 +225,13 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
     side: 'BUY' | 'SELL',
     quantity: number,
     stopPrice: number,
+    type: OrderType = OrderType.STOP_MARKET,
   ): Promise<OrderDTO> {
     try {
       const params: PlaceOrderParams = {
         symbol,
         side: side === 'BUY' ? 'SELL' : 'BUY', // +
-        type: OrderType.STOP_MARKET,
+        type,
         stopPrice,
         closePosition: true,
       };
@@ -264,12 +259,13 @@ export class BinanceService implements OnModuleInit, OnModuleDestroy {
     side: 'BUY' | 'SELL',
     quantity: number,
     stopPrice: number,
+    type: OrderType = OrderType.TAKE_PROFIT_MARKET,
   ): Promise<OrderDTO> {
     try {
       const params: PlaceOrderParams = {
         symbol,
         side: side === 'BUY' ? 'SELL' : 'BUY',
-        type: OrderType.TAKE_PROFIT_MARKET,
+        type,
         stopPrice,
         closePosition: true,
       };

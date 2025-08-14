@@ -108,8 +108,11 @@ export interface PositionInfo {
 }
 
 export enum OrderType {
-  STOP_MARKET = "STOP_MARKET",
-  LIMIT = "LIMIT",
-  TAKE_PROFIT_MARKET = "TAKE_PROFIT_MARKET",
-  TAKE_PROFIT_LIMIT = "TAKE_PROFIT_LIMIT",
+  // taker
+  STOP_MARKET = 'STOP_MARKET',
+  TAKE_PROFIT_MARKET = 'TAKE_PROFIT_MARKET',
+
+  // maker
+  LIMIT = 'LIMIT',
+  TAKE_PROFIT_LIMIT = 'TAKE_PROFIT_LIMIT',
 }

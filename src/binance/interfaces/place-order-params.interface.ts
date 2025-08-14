@@ -1,4 +1,4 @@
-import { OrderType } from "src/trading/interfaces/trading.interface";
+import { OrderType } from 'src/trading/interfaces/trading.interface';
 
 export interface PlaceOrderParams {
   symbol: string;
@@ -7,4 +7,5 @@ export interface PlaceOrderParams {
   stopPrice: number;
   closePosition?: boolean;
   quantity?: number;
+  workingType?: string;
 }
